@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+/dist/
+*.deb
+*.rpm
+*.run
+*.tar.gz
+/lumen-camera-preview.png
+.venv/

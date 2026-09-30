@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Lumen Camera
+Comment=Webcam photos, videos and camera controls
+Exec=lumencamera
+Icon=io.github.machent.LumenCamera
+Terminal=false
+Categories=AudioVideo;Video;Photography;
+StartupNotify=true
+StartupWMClass=Lumen Camera

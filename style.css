@@ -1,0 +1,29 @@
+window { background: #11151e; color: #e8ecf5; }
+headerbar { background: #191f2c; border: none; box-shadow: none; padding: 8px; }
+headerbar .title { font-weight: bold; }
+.sidebar { background: #191f2c; border-radius: 14px; padding: 20px; }
+.title { font-size: 22px; font-weight: bold; }
+.section { font-size: 12px; font-weight: bold; color: #90a6c7; }
+.dim { color: #97a4b9; }
+.preview { background: #080b11; border-radius: 16px; }
+button { background: #283348; color: #e8ecf5; border: 1px solid #35435b; border-radius: 9px; padding: 8px 14px; box-shadow: none; text-shadow: none; }
+button:hover { background: #344563; }
+button.primary { background: #7197ff; color: #0d172d; border-color: #7197ff; font-weight: bold; padding: 12px 26px; }
+button.recording { background: #c74b62; border-color: #c74b62; color: white; }
+button:disabled { opacity: 0.45; }
+headerbar button.window-control {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0;
+    margin: 0;
+    border-radius: 8px;
+    -gtk-icon-shadow: none;
+}
+headerbar button.window-control.close-control:hover { background: #b43b50; border-color: #b43b50; color: white; }
+entry, combobox button { background: #222b3c; border: 1px solid #35435b; color: #e8ecf5; border-radius: 8px; }
+scale trough { background: #35435b; min-height: 5px; border-radius: 4px; }
+scale highlight { background: #7197ff; }
+scale slider { background: #d6e1ff; border-radius: 12px; min-width: 14px; min-height: 14px; }
+switch:checked { background: #7197ff; }
+.status { padding: 10px; color: #a9bad5; }
+dialog { background: #191f2c; }
