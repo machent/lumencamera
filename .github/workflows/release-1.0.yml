@@ -1,0 +1,80 @@
+name: Publish LumenCamera 1.0
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/release-1.0.yml]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: release-1.0
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'machent/lumencamera' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: machent/lumencamera
+      RELEASE_COMMIT: bebc6f4e13cd392e1a293cfd2a1b2e55ad24d9ec
+      BUILD_RUN: '36786873828'
+    steps:
+      - name: Verify successful build and download its packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN" > build.json
+          jq -e --arg sha "$RELEASE_COMMIT" '.head_sha == $sha and .conclusion == "success" and .event == "push"' build.json
+          gh run download "$BUILD_RUN" --name deb-and-source --name rpm-and-srpm --dir artifacts
+          mkdir packages
+          shopt -s nullglob
+          deb=(artifacts/deb-and-source/*.deb)
+          rpm=(artifacts/rpm-and-srpm/*.noarch.rpm)
+          test "${#deb[@]}" -eq 1
+          test "${#rpm[@]}" -eq 1
+          test "$(dpkg-deb -f "${deb[0]}" Package)" = lumencamera
+          test "$(dpkg-deb -f "${deb[0]}" Version)" = 1.0-1
+          test "$(dpkg-deb -f "${deb[0]}" Architecture)" = all
+          cp "${deb[0]}" "${rpm[0]}" packages/
+          (cd packages && sha256sum *.deb *.rpm > SHA256SUMS)
+      - name: Prepare release notes
+        shell: bash
+        run: |
+          cat > release-notes.md <<'NOTES'
+          First public release of LumenCamera for Fedora and Ubuntu.
+
+          - Webcam selection, resolution and frame-rate settings.
+          - PNG/JPEG photos and WebM video recording with optional microphone audio.
+          - Supported camera controls in the main sidebar, including focus, autofocus and sharpness.
+          - Configurable save folder and filename pattern.
+          - Modern dark interface with compact window buttons.
+
+          **Ubuntu / Debian:** download the `.deb`, then run `sudo apt install ./lumencamera_1.0-1_all.deb` from the download folder.
+
+          **Fedora:** download the `.noarch.rpm`, then run `sudo dnf install ./lumencamera-1.0-1*.noarch.rpm` from the download folder.
+
+          Launch Lumen Camera from the application menu or run `lumencamera`.
+
+          `SHA256SUMS` contains the package checksums. Packages are unsigned. Hosted APT and DNF repositories will be added separately.
+
+          Ubuntu synthetic-camera tests and Debian/Fedora package builds passed. Camera controls depend on the webcam; physical hardware still needs device testing.
+          NOTES
+      - name: Upload packages and publish the release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v1.0 --json isDraft > existing.json 2>/dev/null; then
+            jq -e '.isDraft == true' existing.json
+            gh release upload v1.0 packages/* --clobber
+            gh release edit v1.0 --title 'LumenCamera 1.0' --notes-file release-notes.md
+          else
+            gh release create v1.0 packages/* --target "$RELEASE_COMMIT" --title 'LumenCamera 1.0' --notes-file release-notes.md --draft
+          fi
+          gh release view v1.0 --json assets > release.json
+          jq -e '.assets | length == 3 and all(.[]; .size > 0)' release.json
+          gh release edit v1.0 --draft=false --latest

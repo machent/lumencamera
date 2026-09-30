@@ -16,6 +16,24 @@ A modern webcam app for Fedora and Ubuntu with camera selection, photo capture, 
 
 Camera controls depend on the device. Unsupported controls are omitted; unavailable or read-only controls are disabled. Manual focus and exposure may require switching their automatic modes off.
 
+## Install version 1.0
+
+Download the package for your distribution from [GitHub Releases](https://github.com/machent/lumencamera/releases/tag/v1.0).
+
+Ubuntu / Debian, from the download folder:
+
+```bash
+sudo apt install ./lumencamera_1.0-1_all.deb
+```
+
+Fedora, from the download folder:
+
+```bash
+sudo dnf install ./lumencamera-1.0-1*.noarch.rpm
+```
+
+Open Lumen Camera from the application menu or run `lumencamera`. The release includes SHA-256 checksums. Hosted APT and DNF repositories will be added later.
+
 ## Run from source
 
 Install the dependencies for your distribution, then run:
@@ -62,7 +80,7 @@ The package name and native-package launcher are `lumencamera`. Package output g
 
 The `.run` installer instead installs for the current user and uses `~/.local/bin/lumen-camera`. It asks before installing missing dependencies. Run it without sudo.
 
-See [packaging/PUBLISHING.md](packaging/PUBLISHING.md) for publication status and package instructions. GitHub release downloads, COPR and APT repository publishing will be configured separately; they are not live yet.
+See [packaging/PUBLISHING.md](packaging/PUBLISHING.md) for publication status and package instructions. GitHub Releases provides the 1.0 Debian and Fedora packages. COPR and APT repository publishing will be configured separately.
 
 ## Settings and captures
 

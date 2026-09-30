@@ -4,7 +4,7 @@ The initial public version is **1.0**. The package name is **lumencamera**.
 
 ## Current status
 
-This repository contains the application source, an RPM specification, a Debian package builder and build validation workflow. Releases and hosted package repositories are not configured yet. Do not advertise COPR or APT install commands until those services have been published and tested.
+This repository contains the application source, an RPM specification, a Debian package builder and build validation workflow. The 1.0 release workflow publishes the Debian and binary RPM packages from validated build run `36786873828`, targeting its exact source commit. Hosted package repositories are not configured yet. Do not advertise COPR or APT install commands until those services have been published and tested.
 
 ## Local packages
 
@@ -34,7 +34,7 @@ sudo apt install ./dist/lumencamera_1.0-1_all.deb
 
 ## Planned distribution
 
-1. GitHub Releases will carry the `.run`, `.deb`, binary `.rpm`, source RPM and source archive.
+1. GitHub Releases carries the 1.0 `.deb`, binary `.rpm` and SHA-256 checksums, with automatic source downloads. Other installer formats may be added later.
 2. Fedora COPR will build and sign RPMs and provide a DNF repository.
 3. A signed APT repository will host the Debian package and its package indices, Release metadata, InRelease signature and public signing key. GitHub Pages can host those static repository files.
 
