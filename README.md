@@ -32,7 +32,7 @@ Fedora, from the download folder:
 sudo dnf install ./lumencamera-1.0-1*.noarch.rpm
 ```
 
-Open Lumen Camera from the application menu or run `lumencamera`. The release includes SHA-256 checksums. Hosted APT and DNF repositories will be added later.
+Open Lumen Camera from the application menu or run `lumencamera`. The release includes SHA-256 checksums. The signed APT and DNF repository workflow is included. See [owner setup](packaging/repositories/README.md) to activate hosting.
 
 ## Run from source
 
@@ -80,7 +80,7 @@ The package name and native-package launcher are `lumencamera`. Package output g
 
 The `.run` installer instead installs for the current user and uses `~/.local/bin/lumen-camera`. It asks before installing missing dependencies. Run it without sudo.
 
-See [packaging/PUBLISHING.md](packaging/PUBLISHING.md) for publication status and package instructions. GitHub Releases provides the 1.0 Debian and Fedora packages. COPR and APT repository publishing will be configured separately.
+See [packaging/PUBLISHING.md](packaging/PUBLISHING.md) for publication status and package instructions. GitHub Releases provides the 1.0 Debian and Fedora packages. The signed APT and DNF repository workflow requires a signing secret and GitHub Pages activation; see the owner setup instructions.
 
 ## Settings and captures
 

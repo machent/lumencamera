@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LumenCamera repositories</title>
+<style>
+  :root{color-scheme:dark;font-family:system-ui,sans-serif;background:#12151c;color:#ecf0f7}
+  body{max-width:850px;margin:70px auto;padding:0 24px;line-height:1.6}
+  h1{font-size:42px;line-height:1.15;letter-spacing:-1px}h2{margin-top:40px}
+  a{color:#8bb8ff}pre{padding:20px;background:#1d2430;border:1px solid #303b4e;border-radius:12px;overflow-x:auto;font-size:14px}
+  .intro{color:#b9c4d6;font-size:19px}footer{margin-top:45px;color:#a7b2c5}
+</style>
+<body>
+<h1>LumenCamera</h1>
+<p class="intro">Signed packages for Fedora and Ubuntu. Add the repository once, then get updates through your usual package manager.</p>
+<h2>Fedora</h2>
+<pre><code>curl -fsSL https://machent.github.io/lumencamera/lumencamera.repo -o /tmp/lumencamera.repo
+sudo install -m 0644 /tmp/lumencamera.repo /etc/yum.repos.d/lumencamera.repo
+sudo dnf install lumencamera</code></pre>
+<h2>Ubuntu</h2>
+<pre><code>sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://machent.github.io/lumencamera/lumencamera-signing-key.asc -o /tmp/lumencamera.asc
+sudo install -m 0644 /tmp/lumencamera.asc /etc/apt/keyrings/lumencamera.asc
+curl -fsSL https://machent.github.io/lumencamera/lumencamera.sources -o /tmp/lumencamera.sources
+sudo install -m 0644 /tmp/lumencamera.sources /etc/apt/sources.list.d/lumencamera.sources
+sudo apt update
+sudo apt install lumencamera</code></pre>
+<p>Open Lumen Camera from the application menu, or run <code>lumencamera</code>.</p>
+<p>The repository supports Ubuntu amd64 and arm64 packages and Fedora noarch packages. Camera controls depend on your device.</p>
+<footer><a href="https://github.com/machent/lumencamera">Source and documentation</a> · <a href="https://github.com/machent/lumencamera/releases">Releases</a> · <a href="signing-key-fingerprint.txt">Signing key fingerprint</a></footer>
+</body>
+</html>

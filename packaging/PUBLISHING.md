@@ -4,7 +4,7 @@ The initial public version is **1.0**. The package name is **lumencamera**.
 
 ## Current status
 
-This repository contains the application source, an RPM specification, a Debian package builder and build validation workflow. The 1.0 release workflow publishes the Debian and binary RPM packages from validated build run `36786873828`, targeting its exact source commit. Hosted package repositories are not configured yet. Do not advertise COPR or APT install commands until those services have been published and tested.
+This repository contains the application source, an RPM specification, a Debian package builder and build validation workflow. The 1.0 release workflow publishes the Debian and binary RPM packages from validated build run `36786873828`, targeting its exact source commit. Signed APT and DNF repository scripts and an installation-test workflow are now included. Deployment requires the owner signing-key secret and GitHub Pages activation; see [repository setup](repositories/README.md). Do not advertise hosted installation commands before deployment passes.
 
 ## Local packages
 
@@ -35,10 +35,10 @@ sudo apt install ./dist/lumencamera_1.0-1_all.deb
 ## Planned distribution
 
 1. GitHub Releases carries the 1.0 `.deb`, binary `.rpm` and SHA-256 checksums, with automatic source downloads. Other installer formats may be added later.
-2. Fedora COPR will build and sign RPMs and provide a DNF repository.
+2. A signed DNF repository will host the noarch Fedora package on GitHub Pages.
 3. A signed APT repository will host the Debian package and its package indices, Release metadata, InRelease signature and public signing key. GitHub Pages can host those static repository files.
 
-APT repository publication needs a maintainer-owned signing key and Pages configuration. The private signing key belongs in a protected GitHub Actions secret, never in the source tree. RPM release downloads also need a package-signing plan; COPR can handle signing for the hosted Fedora repository.
+APT and DNF repository publication use a dedicated maintainer-owned signing key stored in the `LUMENCAMERA_SIGNING_KEY` Actions secret. Private keys never belong in the source tree. The hosted RPM copies are signed without replacing the original release assets.
 
 ## Versions
 

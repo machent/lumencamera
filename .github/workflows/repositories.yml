@@ -1,0 +1,121 @@
+name: Build signed APT and DNF repositories
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/repositories.yml
+      - packaging/repositories/**
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-repositories
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'machent/lumencamera' && (github.event_name == 'release' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    outputs:
+      configured: ${{ steps.signing.outputs.configured }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install repository tools
+        run: sudo apt-get update && sudo apt-get install -y apt-utils gnupg
+      - name: Download stable release packages and verify checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: machent/lumencamera
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir packages
+          gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' > tags.txt
+          while IFS= read -r tag; do
+            gh release download "$tag" --pattern '*.deb' --pattern '*.noarch.rpm' --pattern SHA256SUMS --dir download
+            (cd download && sha256sum --check SHA256SUMS)
+            cp download/*.deb download/*.noarch.rpm packages/
+            rm -rf download
+          done < tags.txt
+          test -n "$(find packages -name '*.deb' -print -quit)"
+          test -n "$(find packages -name '*.noarch.rpm' -print -quit)"
+      - name: Load signing key or create a disposable validation key
+        id: signing
+        env:
+          SIGNING_KEY: ${{ secrets.LUMENCAMERA_SIGNING_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "$RUNNER_TEMP/repository-signing"
+          if [[ -n $SIGNING_KEY ]]; then
+            printf '%s\n' "$SIGNING_KEY" > "$RUNNER_TEMP/repository-signing/private-key.asc"
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+          else
+            bash packaging/repositories/create-signing-key.sh "$RUNNER_TEMP/repository-signing"
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo 'Validation only: set LUMENCAMERA_SIGNING_KEY and enable GitHub Pages to publish.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Build and verify signed APT metadata
+        run: bash packaging/repositories/build.sh apt packages site "$RUNNER_TEMP/repository-signing/private-key.asc"
+      - name: Test APT installation on Ubuntu
+        shell: bash
+        run: |
+          docker run --rm -v "$PWD/site:/repository:ro" ubuntu:24.04 bash -euc '
+            install -d -m 0755 /etc/apt/keyrings
+            cp /repository/lumencamera-signing-key.asc /etc/apt/keyrings/lumencamera.asc
+            printf "deb [signed-by=/etc/apt/keyrings/lumencamera.asc] file:/repository/apt stable main\n" > /etc/apt/sources.list.d/lumencamera.list
+            apt-get update
+            apt-cache policy lumencamera
+            apt-get install -y lumencamera
+            test "$(dpkg-query -W -f="\${Status}" lumencamera)" = "install ok installed"
+            /usr/bin/python3 -c "import gi; gi.require_version(\"Gtk\", \"3.0\"); gi.require_version(\"Gst\", \"1.0\"); from gi.repository import Gtk, Gst"
+          '
+      - name: Sign RPMs, build metadata and test DNF installation on Fedora
+        shell: bash
+        run: |
+          docker run --rm -v "$PWD:/source" -v "$RUNNER_TEMP/repository-signing:/signing:ro" -w /source fedora:44 bash -euc '
+            dnf install -y rpm-sign createrepo_c gnupg2 python3
+            bash packaging/repositories/build.sh rpm packages site /signing/private-key.asc
+            sed -e "s|https://machent.github.io/lumencamera/rpm|file:///source/site/rpm|" -e "s|https://machent.github.io/lumencamera/lumencamera-signing-key.asc|file:///source/site/lumencamera-signing-key.asc|" site/lumencamera.repo > /etc/yum.repos.d/lumencamera.repo
+            dnf install -y lumencamera
+            rpm -q lumencamera
+            /usr/bin/python3 -c "import gi; gi.require_version(\"Gtk\", \"3.0\"); gi.require_version(\"Gst\", \"1.0\"); from gi.repository import Gtk, Gst"
+          '
+      - name: Write repository landing page
+        run: |
+          cp packaging/repositories/index.html site/index.html
+          touch site/.nojekyll
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-repository-validation
+          path: site/
+          if-no-files-found: error
+      - uses: actions/upload-pages-artifact@v4
+        if: steps.signing.outputs.configured == 'true'
+        with:
+          path: site/
+      - name: Remove signing material
+        if: always()
+        run: sudo rm -rf "$RUNNER_TEMP/repository-signing"
+
+  deploy:
+    if: needs.build.outputs.configured == 'true'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy signed repositories
+        id: deployment
+        uses: actions/deploy-pages@v4
