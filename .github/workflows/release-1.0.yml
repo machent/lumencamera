@@ -24,7 +24,19 @@ jobs:
       RELEASE_COMMIT: bebc6f4e13cd392e1a293cfd2a1b2e55ad24d9ec
       BUILD_RUN: '36786873828'
     steps:
+      - name: Update title of an existing published release
+        id: existing
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v1.0 --json isDraft > existing.json 2>/dev/null && jq -e '.isDraft == false' existing.json; then
+            gh release edit v1.0 --title 'v1.0'
+            echo 'published=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'published=false' >> "$GITHUB_OUTPUT"
+          fi
       - name: Verify successful build and download its packages
+        if: steps.existing.outputs.published != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -43,6 +55,7 @@ jobs:
           cp "${deb[0]}" "${rpm[0]}" packages/
           (cd packages && sha256sum *.deb *.rpm > SHA256SUMS)
       - name: Prepare release notes
+        if: steps.existing.outputs.published != 'true'
         shell: bash
         run: |
           cat > release-notes.md <<'NOTES'
@@ -65,15 +78,16 @@ jobs:
           Ubuntu synthetic-camera tests and Debian/Fedora package builds passed. Camera controls depend on the webcam; physical hardware still needs device testing.
           NOTES
       - name: Upload packages and publish the release
+        if: steps.existing.outputs.published != 'true'
         shell: bash
         run: |
           set -euo pipefail
           if gh release view v1.0 --json isDraft > existing.json 2>/dev/null; then
             jq -e '.isDraft == true' existing.json
             gh release upload v1.0 packages/* --clobber
-            gh release edit v1.0 --title 'LumenCamera 1.0' --notes-file release-notes.md
+            gh release edit v1.0 --title 'v1.0' --notes-file release-notes.md
           else
-            gh release create v1.0 packages/* --target "$RELEASE_COMMIT" --title 'LumenCamera 1.0' --notes-file release-notes.md --draft
+            gh release create v1.0 packages/* --target "$RELEASE_COMMIT" --title 'v1.0' --notes-file release-notes.md --draft
           fi
           gh release view v1.0 --json assets > release.json
           jq -e '.assets | length == 3 and all(.[]; .size > 0)' release.json
