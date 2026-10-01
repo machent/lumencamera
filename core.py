@@ -85,6 +85,30 @@ def parse_controls(text):
 RAW_FORMATS = {'YUYV': 'YUY2', 'UYVY': 'UYVY', 'NV12': 'NV12', 'YU12': 'I420', 'RGB3': 'RGB', 'BGR3': 'BGR', 'GREY': 'GRAY8'}
 
 
+def restore_camera_defaults(read_controls, write_control):
+    """Restore driver defaults, rechecking availability after auto-mode changes."""
+    targets = {c['name']: c['default'] for c in read_controls()
+               if 'default' in c and not any(f in c['flags'] for f in ('disabled', 'read-only', 'grabbed'))}
+    restored, failed = [], []
+    pending = dict(targets)
+    # Manual values first: restoring an auto mode may deactivate them. A second
+    # pass handles controls that become available when an auto default is off.
+    for _ in range(2):
+        controls = sorted(read_controls(), key=lambda c: 'auto' in c['name'])
+        for c in controls:
+            name = c['name']
+            if name not in pending or any(f in c['flags'] for f in ('inactive', 'disabled', 'read-only', 'grabbed')):
+                continue
+            value = pending.pop(name)
+            try:
+                write_control(name, value)
+            except Exception as exc:
+                failed.append(f'{name}: {exc}')
+            else:
+                restored.append(name)
+    return dict(restored=restored, failed=failed, skipped=list(pending))
+
+
 def parse_modes(text):
     modes = []
     fourcc = None

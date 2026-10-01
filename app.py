@@ -4,19 +4,22 @@
 import argparse
 import concurrent.futures
 import glob
+import math
 import os
+import random
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 import gi
+import cairo
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gst', '1.0')
 gi.require_version('GstVideo', '1.0')
 from gi.repository import Gtk, Gdk, GdkPixbuf, Gio, GLib, Gst, GstVideo
-from core import Settings, VERSION, APP_ID, reserve_output, parse_controls, parse_modes, mode_id, mode_label, capture_source
+from core import Settings, VERSION, APP_ID, reserve_output, parse_controls, parse_modes, mode_id, mode_label, capture_source, restore_camera_defaults
 from easter_egg import settings_encounter, launch_hijack
 
 Gst.init(None)
@@ -61,17 +64,19 @@ def button(text, action, style=None):
 
 
 class MysteryButton(Gtk.Button):
-    """A small, keyboard-accessible animated glitch glyph, with no dialog."""
+    """HIJACK-style band tearing and static across the button and its aura."""
     def __init__(self, action):
         super().__init__()
         self.get_accessible().set_name('?????')
         self.get_style_context().add_class('mystery-button')
         self.connect('clicked', action)
         self.art = Gtk.DrawingArea()
-        self.art.set_size_request(132, 34)
+        self.art.set_size_request(190, 78)
         self.art.connect('draw', self.draw_glitch)
         self.add(self.art)
         self.frame = 0
+        self.frames = []
+        self.frame_size = None
         self.animation = None
         self.connect('map', self.start_animation)
         self.connect('unmap', self.stop_animation)
@@ -79,7 +84,7 @@ class MysteryButton(Gtk.Button):
 
     def start_animation(self, *_):
         if self.animation is None:
-            self.animation = GLib.timeout_add(90, self.animate)
+            self.animation = GLib.timeout_add(42, self.animate)
 
     def stop_animation(self, *_):
         if self.animation is not None:
@@ -92,23 +97,76 @@ class MysteryButton(Gtk.Button):
         return True
 
     def draw_glitch(self, area, cr):
-        cr.select_font_face('monospace', 0, 1)
-        cr.set_font_size(22)
-        width = cr.text_extents('?????')[4]
-        x = (area.get_allocated_width() - width) / 2
-        y = (area.get_allocated_height() + 16) / 2
-        jitter = (self.frame % 7 == 0)
-        for dx, dy, color in [(-2 if jitter else -1, 0, (0.25, 0.92, 0.95)),
-                              (2 if jitter else 1, 1, (0.97, 0.31, 0.65)),
-                              (0, 0, (0.93, 0.92, 1.0))]:
-            cr.set_source_rgb(*color)
-            cr.move_to(x + dx, y + dy)
-            cr.show_text('?????')
-        if jitter:
-            cr.set_source_rgba(0.15, 0.09, 0.25, 0.9)
-            cr.rectangle(7, 7 + (self.frame * 3 % 20), area.get_allocated_width() - 14, 2)
-            cr.fill()
+        size = (area.get_allocated_width(), area.get_allocated_height())
+        if self.frame_size != size:
+            self.frames = self.build_frames(*size)
+            self.frame_size = size
+        cr.set_source_surface(self.frames[self.frame % len(self.frames)], 0, 0)
+        cr.paint()
+        if self.get_state_flags() & (Gtk.StateFlags.PRELIGHT | Gtk.StateFlags.FOCUSED):
+            cr.set_source_rgba(0.5, 1, 1, 0.8)
+            cr.set_line_width(1)
+            cr.rectangle(28.5, 18.5, size[0] - 57, size[1] - 37)
+            cr.stroke()
         return False
+
+    @staticmethod
+    def build_frames(width, height):
+        # Cache 24 small Cairo surfaces, as HIJACK does for its info icon.
+        rng = random.Random(0x1AF04D)
+        frames = []
+        colors = [(0.1, 0.92, 1), (1, 0.12, 0.46), (0.9, 0.9, 1)]
+        for index in range(24):
+            burst = index in (6, 17)
+            base = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+            ctx = cairo.Context(base)
+            x, y, w, h = 26, 17, width - 52, height - 34
+            pulse = 0.6 + 0.4 * math.sin(index * math.tau / 24)
+            for radius in range(14, 0, -2):
+                for dx, color in [(-3, colors[0]), (3, colors[1])]:
+                    ctx.set_source_rgba(*color, (0.015 + pulse * 0.02) * (1.8 if burst else 1))
+                    ctx.rectangle(x - radius + dx, y - radius, w + radius * 2, h + radius * 2)
+                    ctx.fill()
+            ctx.set_source_rgb(0.11, 0.055, 0.17)
+            ctx.rectangle(x, y, w, h)
+            ctx.fill()
+            for dx, dy, color in [(-2, -1, colors[0]), (2, 1, colors[1])]:
+                ctx.set_source_rgba(*color, 0.75)
+                ctx.set_line_width(1.5)
+                ctx.rectangle(x + dx, y + dy, w, h)
+                ctx.stroke()
+            ctx.select_font_face('monospace', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            ctx.set_font_size(24)
+            text_width = ctx.text_extents('?????').x_advance
+            for dx, dy, color in [(-3, 0, colors[0]), (3, 1, colors[1]), (0, 0, colors[2])]:
+                ctx.set_source_rgb(*color)
+                ctx.move_to((width - text_width) / 2 + dx, height / 2 + 9 + dy)
+                ctx.show_text('?????')
+            image = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+            ctx = cairo.Context(image)
+            ctx.set_source_surface(base, rng.randint(-2, 2), rng.randint(-1, 1))
+            ctx.paint()
+            # Tear the entire surface, including both edges and the glow.
+            for _ in range(rng.randint(4, 9)):
+                band_y, band_h = rng.randrange(height - 5), rng.randint(1, 5)
+                ctx.save()
+                ctx.rectangle(0, band_y, width, band_h)
+                ctx.clip()
+                ctx.set_operator(cairo.OPERATOR_SOURCE)
+                ctx.set_source_surface(base, rng.randint(-11, 11), 0)
+                ctx.paint()
+                ctx.restore()
+            for _ in range(45 if burst else 12):
+                ctx.set_source_rgba(*rng.choice([(0, 0, 0), *colors]), rng.uniform(0.4, 0.9))
+                ctx.rectangle(rng.randrange(8, width - 8), rng.randrange(5, height - 5), rng.randint(1, 6), rng.randint(1, 2))
+                ctx.fill()
+            # Broken scan lines wander through the aura as well as the face.
+            for _ in range(3 if burst else 1):
+                ctx.set_source_rgba(*rng.choice(colors[:2]), 0.45)
+                ctx.rectangle(rng.randrange(8, width // 2), rng.randrange(6, height - 6), rng.randint(18, width // 2), 1)
+                ctx.fill()
+            frames.append(image)
+        return frames
 
 
 def window_button(name, action, maximized=None):
@@ -186,6 +244,7 @@ class CameraWindow(Gtk.ApplicationWindow):
         self.started_at = 0
         self.finalize_timer = None
         self.updating = False
+        self.defaults_busy = False
 
         self.connect('delete-event', self.on_close)
         header = Gtk.HeaderBar(title='Lumen Camera', subtitle='Photo & video studio', show_close_button=False)
@@ -245,6 +304,9 @@ class CameraWindow(Gtk.ApplicationWindow):
         self.sidebar.pack_start(label('CAMERA CONTROLS', 'section'), False, False, 0)
         self.controls_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         self.sidebar.pack_start(self.controls_box, False, False, 0)
+        self.defaults_button = button('Camera Defaults', self.confirm_camera_defaults)
+        self.defaults_button.set_sensitive(False)
+        self.sidebar.pack_start(self.defaults_button, False, False, 0)
         self.sidebar.pack_start(label('Controls depend on your webcam. Manual focus and exposure may require their automatic modes to be off.', 'dim'), False, False, 0)
         self.status_label = label('Looking for cameras…', 'status')
         self.status_label.set_ellipsize(3)
@@ -296,7 +358,7 @@ class CameraWindow(Gtk.ApplicationWindow):
         future.add_done_callback(lambda _: GLib.idle_add(finish))
 
     def refresh_cameras(self, *_):
-        if self.recording or self.finalizing:
+        if self.recording or self.finalizing or self.defaults_busy:
             return
         self.refresh_button.set_sensitive(False)
         self.status('Looking for cameras…')
@@ -325,7 +387,7 @@ class CameraWindow(Gtk.ApplicationWindow):
         self.background(camera_inventory if not self.demo else lambda: [], complete)
 
     def camera_changed(self, *_):
-        if self.updating or self.recording or self.finalizing:
+        if self.updating or self.recording or self.finalizing or self.defaults_busy:
             return
         self.device = self.camera_combo.get_active_id()
         self.generation += 1
@@ -361,7 +423,7 @@ class CameraWindow(Gtk.ApplicationWindow):
         self.background(work, complete, generation)
 
     def mode_changed(self, *_):
-        if self.updating or self.recording or self.finalizing or not self.device:
+        if self.updating or self.recording or self.finalizing or self.defaults_busy or not self.device:
             return
         selected = self.mode_combo.get_active_id()
         self.mode = next((m for m in self.modes if mode_id(m) == selected), None)
@@ -373,6 +435,7 @@ class CameraWindow(Gtk.ApplicationWindow):
         for child in self.controls_box.get_children():
             self.controls_box.remove(child)
         self.controls = controls
+        self.update_defaults_button()
         self.control_widgets.clear()
         if not controls:
             self.controls_box.pack_start(label('No adjustable controls reported.' if not self.demo else 'Demo camera has no hardware controls.', 'dim'), False, False, 0)
@@ -398,7 +461,7 @@ class CameraWindow(Gtk.ApplicationWindow):
                 widget.set_value(control['value'])
                 widget.set_value_pos(Gtk.PositionType.RIGHT)
                 widget.connect('value-changed', lambda w, n=name: self.schedule_control(n, int(w.get_value())))
-            widget.set_sensitive(not any(flag in control['flags'] for flag in ('inactive', 'disabled', 'read-only', 'grabbed')))
+            widget.set_sensitive(not self.defaults_busy and not any(flag in control['flags'] for flag in ('inactive', 'disabled', 'read-only', 'grabbed')))
             widget.set_tooltip_text(name + (' · ' + control['flags'] if control['flags'] else ''))
             self.control_widgets[name] = widget
             row.pack_start(widget, False, False, 0)
@@ -406,7 +469,7 @@ class CameraWindow(Gtk.ApplicationWindow):
         self.controls_box.show_all()
 
     def schedule_control(self, name, value):
-        if self.updating or not self.device:
+        if self.updating or self.defaults_busy or not self.device:
             return
         if name in self.debounce:
             GLib.source_remove(self.debounce.pop(name))
@@ -443,9 +506,59 @@ class CameraWindow(Gtk.ApplicationWindow):
                     widget.set_active_id(str(c['value']))
                 else:
                     widget.set_value(c['value'])
-                widget.set_sensitive(not any(f in c['flags'] for f in ('inactive', 'disabled', 'read-only', 'grabbed')))
+                widget.set_sensitive(not self.defaults_busy and not any(f in c['flags'] for f in ('inactive', 'disabled', 'read-only', 'grabbed')))
+            self.controls = controls
+            self.update_defaults_button()
             self.updating = False
         self.background(lambda: parse_controls(v4l(device, '--list-ctrls-menus')), finished, generation)
+
+    def update_defaults_button(self):
+        adjustable = any('default' in c and not any(f in c['flags'] for f in ('inactive', 'disabled', 'read-only', 'grabbed')) for c in self.controls)
+        self.defaults_button.set_sensitive(bool(self.device) and not self.demo and adjustable and not self.defaults_busy)
+
+    def confirm_camera_defaults(self, *_):
+        if not self.defaults_button.get_sensitive():
+            return
+        device, generation = self.device, self.generation
+        dialog = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
+                                   buttons=Gtk.ButtonsType.NONE, text='Restore camera defaults?')
+        dialog.format_secondary_text('Restore adjustable controls for the selected webcam to the defaults reported by its driver. Unavailable and read-only controls will be skipped. Your save settings and captures will stay unchanged.')
+        dialog.add_buttons('Cancel', Gtk.ResponseType.CANCEL, 'Restore Defaults', Gtk.ResponseType.ACCEPT)
+        dialog.set_default_response(Gtk.ResponseType.CANCEL)
+        response = dialog.run()
+        dialog.destroy()
+        if response != Gtk.ResponseType.ACCEPT or self.closed or device != self.device or generation != self.generation:
+            return
+        self.defaults_busy = True
+        self.update_defaults_button()
+        self.lock_capture_settings(self.recording or self.finalizing)
+        for source in self.debounce.values():
+            GLib.source_remove(source)
+        self.debounce.clear()
+        for widget in self.control_widgets.values():
+            widget.set_sensitive(False)
+        self.status('Restoring camera defaults…')
+        def work():
+            read = lambda: parse_controls(v4l(device, '--list-ctrls-menus'))
+            result = restore_camera_defaults(read, lambda name, value: v4l(device, '--set-ctrl', f'{name}={value}'))
+            return result, read()
+        def complete(value, error):
+            self.defaults_busy = False
+            self.lock_capture_settings(self.recording or self.finalizing)
+            if error:
+                self.update_defaults_button()
+                self.refresh_controls()
+                self.status('Could not restore camera defaults: ' + error)
+                return
+            result, controls = value
+            self.render_controls(controls)
+            message = f"Camera defaults restored: {len(result['restored'])} controls."
+            if result['skipped']:
+                message += f" {len(result['skipped'])} unavailable controls skipped."
+            if result['failed']:
+                message += ' Some controls could not be restored: ' + '; '.join(result['failed'])
+            self.status(message)
+        self.background(work, complete, generation)
 
     def start_pipeline(self, path=None):
         self.stop_pipeline()
@@ -558,7 +671,7 @@ class CameraWindow(Gtk.ApplicationWindow):
 
     def lock_capture_settings(self, locked):
         for widget in (self.camera_combo, self.mode_combo, self.refresh_button):
-            widget.set_sensitive(not locked)
+            widget.set_sensitive(not locked and not self.defaults_busy)
 
     def toggle_record(self, *_):
         if self.finalizing:

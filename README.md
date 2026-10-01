@@ -6,7 +6,8 @@ A modern webcam app for Fedora and Ubuntu with camera selection, photo capture, 
 
 The current `main` branch also includes an **unreleased HIJACK easter egg**:
 opening Settings on KDE Plasma 6 and a Fedora/Ubuntu-based system has a 20%
-chance to reveal an animated `?????` button. Clicking launches the matching
+chance to reveal a `?????` button with animated tearing, static and a glitching
+aura, in the style of HIJACK's information icon. Clicking launches the matching
 non-rebooting HIJACK game immediately as a separate process; closing the camera
 app does not close the game. No confirmation dialog appears. Game files are
 optional and are not included in this snapshot. Add your non-rebooting games at
@@ -20,6 +21,7 @@ unchanged. HIJACK may contain flashing visuals and loud audio.
 - Take PNG or JPEG photos at the capture resolution.
 - Record VP8 WebM video, with optional audio from the system default microphone.
 - Adjust supported camera controls in the main sidebar, including focus, autofocus, sharpness, exposure, brightness and white balance.
+- Restore the selected webcam's adjustable controls with **Camera Defaults**, after confirmation. Driver defaults are used; unavailable or read-only controls are skipped. Save settings and captures stay unchanged.
 - Configure the save folder, filename pattern, photo format and preview/photo mirroring.
 - Preserve existing captures with numbered filename suffixes.
 - Open the output folder and see recording time in the main window.

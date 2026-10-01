@@ -35,6 +35,13 @@ def test():
                         mystery = buttons[0]
                         assert mystery.animation and mystery.frame > 0
                         assert mystery.get_accessible().get_name() == '?????'
+                        assert len(mystery.frames) == 24
+                        frames = [bytes(x.get_data()) for x in mystery.frames]
+                        assert len(set(frames)) == 24, 'Glitch frames must animate'
+                        stride = mystery.frames[0].get_stride()
+                        # The aura above the button face must move, too.
+                        aura = [x[5 * stride:15 * stride] for x in frames]
+                        assert len(set(aura)) > 12, 'Aura must glitch independently'
                         screen = Gdk.pixbuf_get_from_window(dialog.get_window(), 0, 0, dialog.get_allocated_width(), dialog.get_allocated_height())
                         preview_directory = Path(os.environ.get('RUNNER_TEMP', str(Path(__file__).resolve().parents[2])))
                         screen.savev(str(preview_directory / 'lumen-easter-egg-preview.png'), 'png', [], [])

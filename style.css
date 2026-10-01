@@ -27,6 +27,14 @@ scale slider { background: #d6e1ff; border-radius: 12px; min-width: 14px; min-he
 switch:checked { background: #7197ff; }
 .status { padding: 10px; color: #a9bad5; }
 dialog { background: #191f2c; }
-button.mystery-button { background: #231a35; border-color: #60416e; padding: 3px 8px; }
-button.mystery-button:hover { background: #302047; border-color: #bf76bd; }
-button.mystery-button:focus { border-color: #92e4ee; }
+button.mystery-button,
+button.mystery-button:hover,
+button.mystery-button:focus,
+button.mystery-button:active {
+    background: transparent;
+    background-image: none;
+    border: none;
+    padding: 0;
+    outline-style: none;
+    box-shadow: none;
+}

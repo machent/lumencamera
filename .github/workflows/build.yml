@@ -27,6 +27,8 @@ jobs:
         run: xvfb-run -a /usr/bin/python3 tests/smoke.py
       - name: Exercise the optional Settings easter egg with a fake game
         run: xvfb-run -a /usr/bin/python3 tests/smoke_easter_egg.py
+      - name: Exercise Camera Defaults confirmation and driver responses
+        run: xvfb-run -a /usr/bin/python3 tests/smoke_defaults.py
       - uses: actions/upload-artifact@v4
         with:
           name: settings-preview

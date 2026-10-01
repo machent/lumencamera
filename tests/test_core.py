@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from core import Settings, reserve_output, parse_controls, parse_modes, capture_source
+from core import Settings, reserve_output, parse_controls, parse_modes, capture_source, restore_camera_defaults
 
 class CoreTests(unittest.TestCase):
     def test_collision_and_safe_filename(self):
@@ -60,6 +60,39 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(len(modes), 3)
         self.assertIn('jpegdec', capture_source('/dev/video0', modes[0]))
         self.assertIn('format=YUY2', capture_source('/dev/video0', modes[2]))
+
+    def test_restore_defaults_rechecks_manual_controls(self):
+        values = dict(focus_auto=1, focus_absolute=45, sharpness=9)
+        writes = []
+        def read():
+            return parse_controls(f'''
+ focus_auto 0x009a090c (bool) : default=0 value={values['focus_auto']}
+ focus_absolute 0x009a090a (int) : min=0 max=255 step=5 default=0 value={values['focus_absolute']} {'flags=inactive' if values['focus_auto'] else ''}
+ sharpness 0x0098091b (int) : min=0 max=10 step=1 default=3 value={values['sharpness']}
+ serial 0x00980900 (int) : default=0 value=3 flags=read-only
+''')
+        def write(name, value):
+            writes.append((name, value))
+            values[name] = value
+        result = restore_camera_defaults(read, write)
+        self.assertEqual(writes, [('sharpness', 3), ('focus_auto', 0), ('focus_absolute', 0)])
+        self.assertEqual(result['failed'], [])
+        self.assertEqual(result['skipped'], [])
+
+    def test_restore_defaults_partial_failure_and_unavailable_controls(self):
+        controls = parse_controls('''
+ brightness 0x00980900 (int) : min=-64 max=64 step=1 default=0 value=4
+ sharpness 0x0098091b (int) : min=0 max=10 step=1 default=3 value=9
+ focus_absolute 0x009a090a (int) : default=0 value=20 flags=inactive
+ locked 0x00980901 (int) : default=0 value=1 flags=grabbed
+''')
+        def write(name, value):
+            if name == 'brightness':
+                raise RuntimeError('camera rejected value')
+        result = restore_camera_defaults(lambda: controls, write)
+        self.assertEqual(result['restored'], ['sharpness'])
+        self.assertEqual(result['skipped'], ['focus_absolute'])
+        self.assertEqual(result['failed'], ['brightness: camera rejected value'])
 
 if __name__ == '__main__':
     unittest.main()
