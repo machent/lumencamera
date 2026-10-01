@@ -28,9 +28,13 @@ hardware camera controls and customizable output filenames and folders.
 
 %install
 install -d %{buildroot}%{_datadir}/lumencamera
-for file in app.py core.py style.css; do
+for file in app.py core.py easter_egg.py style.css; do
     install -m 0644 "$file" %{buildroot}%{_datadir}/lumencamera/
 done
+cp -R easter-eggs %{buildroot}%{_datadir}/lumencamera/
+find %{buildroot}%{_datadir}/lumencamera/easter-eggs -type d -exec chmod 0755 {} +
+find %{buildroot}%{_datadir}/lumencamera/easter-eggs -type f -exec chmod 0644 {} +
+find %{buildroot}%{_datadir}/lumencamera/easter-eggs -type f -name '*.run' -exec chmod 0755 {} +
 install -D -m 0755 packaging/lumencamera %{buildroot}%{_bindir}/lumencamera
 install -D -m 0644 packaging/io.github.machent.LumenCamera.desktop %{buildroot}%{_datadir}/applications/io.github.machent.LumenCamera.desktop
 install -D -m 0644 icon.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/io.github.machent.LumenCamera.svg

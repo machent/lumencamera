@@ -4,6 +4,7 @@ __pycache__/
 *.deb
 *.rpm
 *.run
+!easter-eggs/*.run
 *.tar.gz
 /lumen-camera-preview.png
 .venv/

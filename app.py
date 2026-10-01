@@ -17,6 +17,7 @@ gi.require_version('Gst', '1.0')
 gi.require_version('GstVideo', '1.0')
 from gi.repository import Gtk, Gdk, GdkPixbuf, Gio, GLib, Gst, GstVideo
 from core import Settings, VERSION, APP_ID, reserve_output, parse_controls, parse_modes, mode_id, mode_label, capture_source
+from easter_egg import settings_encounter, launch_hijack
 
 Gst.init(None)
 
@@ -57,6 +58,57 @@ def button(text, action, style=None):
     if style:
         item.get_style_context().add_class(style)
     return item
+
+
+class MysteryButton(Gtk.Button):
+    """A small, keyboard-accessible animated glitch glyph, with no dialog."""
+    def __init__(self, action):
+        super().__init__()
+        self.get_accessible().set_name('?????')
+        self.get_style_context().add_class('mystery-button')
+        self.connect('clicked', action)
+        self.art = Gtk.DrawingArea()
+        self.art.set_size_request(132, 34)
+        self.art.connect('draw', self.draw_glitch)
+        self.add(self.art)
+        self.frame = 0
+        self.animation = None
+        self.connect('map', self.start_animation)
+        self.connect('unmap', self.stop_animation)
+        self.connect('destroy', self.stop_animation)
+
+    def start_animation(self, *_):
+        if self.animation is None:
+            self.animation = GLib.timeout_add(90, self.animate)
+
+    def stop_animation(self, *_):
+        if self.animation is not None:
+            GLib.source_remove(self.animation)
+            self.animation = None
+
+    def animate(self):
+        self.frame += 1
+        self.art.queue_draw()
+        return True
+
+    def draw_glitch(self, area, cr):
+        cr.select_font_face('monospace', 0, 1)
+        cr.set_font_size(22)
+        width = cr.text_extents('?????')[4]
+        x = (area.get_allocated_width() - width) / 2
+        y = (area.get_allocated_height() + 16) / 2
+        jitter = (self.frame % 7 == 0)
+        for dx, dy, color in [(-2 if jitter else -1, 0, (0.25, 0.92, 0.95)),
+                              (2 if jitter else 1, 1, (0.97, 0.31, 0.65)),
+                              (0, 0, (0.93, 0.92, 1.0))]:
+            cr.set_source_rgb(*color)
+            cr.move_to(x + dx, y + dy)
+            cr.show_text('?????')
+        if jitter:
+            cr.set_source_rgba(0.15, 0.09, 0.25, 0.9)
+            cr.rectangle(7, 7 + (self.frame * 3 % 20), area.get_allocated_width() - 14, 2)
+            cr.fill()
+        return False
 
 
 def window_button(name, action, maximized=None):
@@ -655,6 +707,11 @@ class CameraWindow(Gtk.ApplicationWindow):
         audio.set_sensitive(not self.recording)
         box.pack_start(audio, False, False, 0)
         box.pack_start(label('Video keeps the original camera orientation. Audio uses the system default input.', 'dim'), False, False, 0)
+        family = settings_encounter()
+        if family:
+            mystery = MysteryButton(lambda *_: self.start_easter_egg(family))
+            mystery.set_halign(Gtk.Align.END)
+            box.pack_start(mystery, False, False, 0)
         dialog.show_all()
         while dialog.run() == Gtk.ResponseType.OK:
             try:
@@ -671,6 +728,16 @@ class CameraWindow(Gtk.ApplicationWindow):
             except Exception as exc:
                 self.error('Invalid save folder: ' + str(exc))
         dialog.destroy()
+
+    def start_easter_egg(self, family):
+        try:
+            process = launch_hijack(family)
+            # Retain/reap the child without terminating it when this window exits.
+            def reap():
+                return process.poll() is None
+            GLib.timeout_add_seconds(2, reap)
+        except (OSError, RuntimeError) as exc:
+            self.status(str(exc))
 
     def on_close(self, *_):
         if self.recording or self.finalizing:

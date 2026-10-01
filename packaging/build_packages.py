@@ -49,8 +49,12 @@ def deb(out):
     ver = version()
     with tempfile.TemporaryDirectory(prefix='lumencamera-deb-') as tmp:
         stage = Path(tmp) / 'stage'
-        for name in ('app.py', 'core.py', 'style.css'):
+        for name in ('app.py', 'core.py', 'easter_egg.py', 'style.css'):
             put(ROOT / name, stage / 'usr/share/lumencamera' / name)
+        for file in (ROOT / 'easter-eggs').rglob('*'):
+            if file.is_file():
+                put(file, stage / 'usr/share/lumencamera/easter-eggs' / file.relative_to(ROOT / 'easter-eggs'),
+                    0o755 if file.suffix == '.run' else 0o644)
         put(ROOT / 'packaging/lumencamera', stage / 'usr/bin/lumencamera', 0o755)
         put(ROOT / 'packaging/io.github.machent.LumenCamera.desktop', stage / 'usr/share/applications/io.github.machent.LumenCamera.desktop')
         put(ROOT / 'icon.svg', stage / 'usr/share/icons/hicolor/scalable/apps/io.github.machent.LumenCamera.svg')
