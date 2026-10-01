@@ -59,7 +59,7 @@ jobs:
           else
             bash packaging/repositories/create-signing-key.sh "$RUNNER_TEMP/repository-signing"
             echo 'configured=false' >> "$GITHUB_OUTPUT"
-            echo 'Validation only: set LUMENCAMERA_SIGNING_KEY and enable GitHub Pages to publish.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Validation only; deployment skipped.' >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Build and verify signed APT metadata
         run: bash packaging/repositories/build.sh apt packages site "$RUNNER_TEMP/repository-signing/private-key.asc"

@@ -37,7 +37,7 @@ install -D -m 0644 icon.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/
 
 %files
 %license LICENSE
-%doc README.md packaging/PUBLISHING.md
+%doc README.md
 %{_bindir}/lumencamera
 %{_datadir}/lumencamera/
 %{_datadir}/applications/io.github.machent.LumenCamera.desktop

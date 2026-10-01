@@ -109,7 +109,7 @@ The package name and native-package launcher are `lumencamera`. Package output g
 
 The `.run` installer instead installs for the current user and uses `~/.local/bin/lumen-camera`. It asks before installing missing dependencies. Run it without sudo.
 
-See [packaging/PUBLISHING.md](packaging/PUBLISHING.md) for publication status and package instructions. GitHub Releases provides the 1.0 Debian and Fedora packages. Signed APT and DNF repositories are hosted on GitHub Pages; maintainer instructions are in [repository setup](packaging/repositories/README.md).
+GitHub Releases provides the 1.0 Debian and Fedora packages. Signed APT and DNF repositories are hosted on GitHub Pages.
 
 ## Settings and captures
 

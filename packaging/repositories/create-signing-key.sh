@@ -6,7 +6,7 @@ output=${1:-"$HOME/lumencamera-signing"}
 mkdir -p "$output"
 output=$(realpath "$output")
 if [[ -e $output/private-key.asc ]]; then
-  echo "Key already exists: $output/private-key.asc. Keep using this key." >&2
+  echo "Key already exists: $output/private-key.asc." >&2
   exit 1
 fi
 signing_home=$(mktemp -d)
@@ -19,4 +19,3 @@ gpg --batch --armor --export-secret-keys "$fingerprint" > "$output/private-key.a
 gpg --batch --armor --export "$fingerprint" > "$output/public-key.asc"
 printf '%s\n' "$fingerprint" > "$output/fingerprint.txt"
 printf 'Created signing key. Fingerprint: %s\nPrivate key: %s/private-key.asc\n' "$fingerprint" "$output"
-printf 'Back up this folder privately. Add the complete private-key.asc contents to the GitHub Actions secret LUMENCAMERA_SIGNING_KEY. Never commit this file.\n'
