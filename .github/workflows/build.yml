@@ -30,7 +30,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: settings-preview
-          path: ../lumen-easter-egg-preview.png
+          path: ${{ runner.temp }}/lumen-easter-egg-preview.png
           if-no-files-found: error
       - name: Build Debian package and source archive
         run: |

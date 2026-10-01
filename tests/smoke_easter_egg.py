@@ -1,5 +1,6 @@
 """Check the real Settings button, animation and cleanup with a fake game."""
 import sys
+import os
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -35,7 +36,8 @@ def test():
                         assert mystery.animation and mystery.frame > 0
                         assert mystery.get_accessible().get_name() == '?????'
                         screen = Gdk.pixbuf_get_from_window(dialog.get_window(), 0, 0, dialog.get_allocated_width(), dialog.get_allocated_height())
-                        screen.savev(str(Path(__file__).resolve().parents[2] / 'lumen-easter-egg-preview.png'), 'png', [], [])
+                        preview_directory = Path(os.environ.get('RUNNER_TEMP', str(Path(__file__).resolve().parents[2])))
+                        screen.savev(str(preview_directory / 'lumen-easter-egg-preview.png'), 'png', [], [])
                         mystery.clicked()
                         launch.assert_called_once_with('fedora')
                         seen.append(mystery)
