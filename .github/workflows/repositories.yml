@@ -80,7 +80,7 @@ jobs:
         shell: bash
         run: |
           docker run --rm -v "$PWD:/source" -v "$RUNNER_TEMP/repository-signing:/signing:ro" -w /source fedora:44 bash -euc '
-            dnf install -y rpm-sign createrepo_c gnupg2 python3
+            dnf install -y rpm-sign createrepo_c gnupg2 python3 gobject-introspection
             bash packaging/repositories/build.sh rpm packages site /signing/private-key.asc
             sed -e "s|https://machent.github.io/lumencamera/rpm|file:///source/site/rpm|" -e "s|https://machent.github.io/lumencamera/lumencamera-signing-key.asc|file:///source/site/lumencamera-signing-key.asc|" site/lumencamera.repo > /etc/yum.repos.d/lumencamera.repo
             dnf install -y lumencamera
