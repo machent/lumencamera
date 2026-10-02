@@ -157,6 +157,18 @@ jobs:
 
           This release publishes package files; hosted APT/DNF repositories will be updated separately.
           NOTES
+      - name: Verify or create the release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v1.1 --json isDraft > existing.json 2>/dev/null; then
+            jq -e '.isDraft == true' existing.json
+          fi
+          if gh api "repos/$GH_REPO/git/ref/tags/v1.1" > tag.json 2>/dev/null; then
+            jq -e --arg sha "$RELEASE_COMMIT" '.object.sha == $sha' tag.json
+          else
+            gh api --method POST "repos/$GH_REPO/git/refs" -f ref=refs/tags/v1.1 -f sha="$RELEASE_COMMIT"
+          fi
       - name: Publish v1.1
         shell: bash
         run: |
@@ -165,7 +177,7 @@ jobs:
             jq -e '.isDraft == true' existing.json
             test "$(gh api "repos/$GH_REPO/git/ref/tags/v1.1" --jq .object.sha)" = "$RELEASE_COMMIT"
             gh release upload v1.1 packages/* --clobber
-            gh release edit v1.1 --title v1.1 --notes-file release-notes.md
+            gh release edit v1.1 --target "$RELEASE_COMMIT" --title v1.1 --notes-file release-notes.md
           else
             gh release create v1.1 packages/* --target "$RELEASE_COMMIT" --title v1.1 --notes-file release-notes.md --draft
           fi
