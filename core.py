@@ -14,7 +14,7 @@ APP_ID = 'io.github.machent.LumenCamera'
 def default_settings():
     pictures = Path.home() / 'Pictures'
     return dict(folder=str(pictures / 'Lumen Camera'), filename='Capture_%Y-%m-%d_%H-%M-%S',
-                photo_format='png', mirror=True, audio=False, camera='', mode='')
+                photo_format='png', mirror=True, audio=False, microphone='default', camera='', mode='')
 
 
 class Settings:

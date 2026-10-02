@@ -82,7 +82,7 @@ Depends: python3 (>= 3.9), python3-gi, python3-gi-cairo, gir1.2-gtk-3.0, gir1.2-
 Homepage: https://github.com/machent/lumencamera
 Description: Webcam photos, videos and hardware camera controls
  Native GTK webcam application with camera selection, PNG/JPEG photos,
- WebM recording with optional microphone audio, hardware camera controls
+ Matroska recording with selectable microphone audio, hardware camera controls
  and customizable output filenames and folders.
 ''')
         (meta / 'control').chmod(0o644)

@@ -42,7 +42,7 @@ gi.require_version('Gst','1.0')
 gi.require_version('GstVideo','1.0')
 from gi.repository import Gtk,Gst,GstVideo
 Gst.init(None)
-for element in ['v4l2src','videoconvert','appsink','jpegdec','vp8enc','webmmux','pulsesrc','vorbisenc']:
+for element in ['v4l2src','videoconvert','appsink','jpegdec','vp8enc','matroskamux','pulsesrc','vorbisenc']:
     assert Gst.ElementFactory.find(element), element
 PY
 command -v v4l2-ctl >/dev/null || need_deps=1

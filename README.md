@@ -19,7 +19,7 @@ unchanged. HIJACK may contain flashing visuals and loud audio.
 
 - Choose a webcam and its advertised resolution, frame rate and capture format.
 - Take PNG or JPEG photos at the capture resolution.
-- Record VP8 WebM video, with optional audio from the system default microphone.
+- Record VP8 Matroska (`.mkv`) video. Clicking **Record video** opens a dialog with **Record with microphone**; enable it to choose an audio input before starting. The app remembers your last choice.
 - Adjust supported camera controls in the main sidebar, including focus, autofocus, sharpness, exposure, brightness and white balance.
 - Restore the selected webcam's adjustable controls with **Camera Defaults**, after confirmation. Driver defaults are used; unavailable or read-only controls are skipped. Save settings and captures stay unchanged.
 - Configure the save folder, filename pattern, photo format and preview/photo mirroring.
@@ -102,7 +102,7 @@ Mirroring affects the preview and saved photos. Videos retain the camera's origi
 xvfb-run -a /usr/bin/python3 tests/smoke.py
 ```
 
-The smoke test uses a synthetic camera to exercise preview, PNG/JPEG photos, filename collision handling, camera-control widgets, WebM encoding/decoding, synthetic audio encoding and closing during recording. It requires the application dependencies plus Xvfb.
+The smoke test uses a synthetic camera to exercise preview, PNG/JPEG photos, filename collision handling, camera-control widgets, the recording dialog, microphone selection, Matroska encoding/decoding with and without audio, and closing during recording. It requires the application dependencies plus Xvfb.
 
 The initial app was tested with a synthetic camera on Ubuntu 24.04. Physical cameras, actual microphones and Fedora hardware still need device testing. Version 1.0 includes the titlebar correction from the earlier 1.0.1 development build.
 

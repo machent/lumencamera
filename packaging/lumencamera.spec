@@ -17,7 +17,7 @@ Requires:       v4l-utils
 
 %description
 Lumen Camera is a GTK desktop webcam application with camera and capture mode
-selection, PNG/JPEG photos, WebM recording with optional microphone audio,
+selection, PNG/JPEG photos, Matroska recording with selectable microphone audio,
 hardware camera controls and customizable output filenames and folders.
 
 %prep

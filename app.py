@@ -47,6 +47,47 @@ def camera_inventory():
     return devices
 
 
+def microphone_inventory():
+    """Discover capture devices through the installed GStreamer audio providers."""
+    monitor = Gst.DeviceMonitor.new()
+    monitor.add_filter('Audio/Source', Gst.Caps.from_string('audio/x-raw'))
+    try:
+        if not monitor.start():
+            raise RuntimeError('Audio device discovery is unavailable.')
+        microphones = []
+        seen = set()
+        for device in monitor.get_devices() or []:
+            properties = device.get_properties()
+            name = device.get_display_name()
+            identity = None
+            if properties is not None:
+                for key in ('device.name', 'device.path', 'object.path', 'alsa.card', 'device.id'):
+                    if properties.has_field(key):
+                        identity = str(properties.get_value(key))
+                        break
+                if identity and identity.endswith('.monitor'):
+                    continue
+                if properties.has_field('device.class') and properties.get_value('device.class') == 'monitor':
+                    continue
+            identity = identity or name
+            key = device.get_device_class() + ':' + identity
+            if key not in seen:
+                microphones.append(dict(id=key, name=name, device=device))
+                seen.add(key)
+        return sorted(microphones, key=lambda item: item['name'].casefold())
+    finally:
+        monitor.stop()
+
+
+def microphone_source(device=None):
+    source = device.create_element('recordaudio') if device is not None else Gst.ElementFactory.make('pulsesrc', 'recordaudio')
+    if source is None:
+        raise RuntimeError('The selected microphone could not be opened.')
+    if source.find_property('do-timestamp'):
+        source.set_property('do-timestamp', True)
+    return source
+
+
 def label(text, style=None):
     item = Gtk.Label(label=text, xalign=0)
     item.set_line_wrap(True)
@@ -230,6 +271,9 @@ class CameraWindow(Gtk.ApplicationWindow):
         self.recording = False
         self.finalizing = False
         self.record_path = None
+        self.record_audio_enabled = False
+        self.record_audio_device = None
+        self.record_dialog = None
         self.closing = False
         self.closed = False
         self.device = None
@@ -568,13 +612,18 @@ class CameraWindow(Gtk.ApplicationWindow):
         source = capture_source(self.device, self.mode, self.demo)
         description = source + ' ! videoconvert ! tee name=t t. ! queue leaky=downstream max-size-buffers=2 ! videoconvert ! video/x-raw,format=RGB ! appsink name=preview emit-signals=true max-buffers=1 drop=true sync=false wait-on-eos=false'
         if path:
-            description += ' t. ! queue ! videoconvert ! video/x-raw,format=I420 ! vp8enc deadline=1 cpu-used=8 threads=4 target-bitrate=6000000 ! webmmux name=mux ! filesink name=recordfile'
-            if self.settings.values['audio']:
-                description += ' pulsesrc do-timestamp=true ! queue ! audioconvert ! audioresample ! vorbisenc ! queue ! mux.'
+            description += ' t. ! queue ! videoconvert ! video/x-raw,format=I420 ! vp8enc deadline=1 cpu-used=8 threads=4 target-bitrate=6000000 ! matroskamux name=mux ! filesink name=recordfile'
+            if self.record_audio_enabled:
+                description += ' queue name=micqueue ! audioconvert ! audioresample ! vorbisenc ! queue ! mux.'
         try:
             self.pipeline = Gst.parse_launch(description)
             if path:
                 self.pipeline.get_by_name('recordfile').set_property('location', str(path))
+                if self.record_audio_enabled:
+                    audio = microphone_source(self.record_audio_device)
+                    self.pipeline.add(audio)
+                    if not audio.link(self.pipeline.get_by_name('micqueue')):
+                        raise RuntimeError('The selected microphone could not be connected to the recorder.')
             self.pipeline.get_by_name('preview').connect('new-sample', self.on_sample)
             self.bus = self.pipeline.get_bus()
             self.bus.add_signal_watch()
@@ -674,16 +723,24 @@ class CameraWindow(Gtk.ApplicationWindow):
             widget.set_sensitive(not locked and not self.defaults_busy)
 
     def toggle_record(self, *_):
-        if self.finalizing:
+        if self.finalizing or self.record_dialog is not None:
             return
         if self.recording:
             self.finish_record()
             return
         if not self.pixbuf:
             return
+        device, generation = self.device, self.generation
+        options = self.recording_options()
+        if options is None or self.closed or device != self.device or generation != self.generation:
+            return
+        self.record_audio_enabled = options['audio']
+        self.record_audio_device = options['device']
+        self.settings.values.update(audio=options['audio'], microphone=options['microphone'])
+        self.save_settings()
         path = None
         try:
-            path = reserve_output(self.settings.values['folder'], self.settings.values['filename'], 'webm')
+            path = reserve_output(self.settings.values['folder'], self.settings.values['filename'], 'mkv')
             self.record_path = path
             self.recording = True
             if not self.start_pipeline(path):
@@ -703,6 +760,83 @@ class CameraWindow(Gtk.ApplicationWindow):
             if path:
                 path.unlink(missing_ok=True)
             self.error('Could not start recording: ' + str(exc))
+
+    def recording_options(self):
+        dialog = Gtk.Dialog(title='Record video', transient_for=self, modal=True)
+        self.record_dialog = dialog
+        dialog.add_buttons('Cancel', Gtk.ResponseType.CANCEL, 'Start recording', Gtk.ResponseType.OK)
+        dialog.set_default_size(450, 230)
+        box = dialog.get_content_area()
+        box.set_spacing(14)
+        box.set_margin_start(24)
+        box.set_margin_end(24)
+        box.set_margin_top(20)
+        box.set_margin_bottom(20)
+        box.pack_start(label('Record video', 'title'), False, False, 0)
+        audio = Gtk.CheckButton(label='Record with microphone')
+        audio.set_active(self.settings.values['audio'])
+        box.pack_start(audio, False, False, 0)
+        microphone_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        microphone_box.pack_start(label('MICROPHONE', 'section'), False, False, 0)
+        microphones = Gtk.ComboBoxText()
+        microphones.set_hexpand(True)
+        microphone_box.pack_start(microphones, False, False, 0)
+        box.pack_start(microphone_box, False, False, 0)
+        info = label('Finding microphones…', 'dim')
+        box.pack_start(info, False, False, 0)
+        box.pack_start(label('Video will be saved as Matroska (.mkv).', 'dim'), False, False, 0)
+        devices = {}
+        state = dict(alive=True, loaded=False, fade=None)
+        microphone_box.set_opacity(1 if audio.get_active() else 0.45)
+        def update(*_):
+            enabled = audio.get_active()
+            microphones.set_sensitive(enabled and state['loaded'])
+            dialog.set_response_sensitive(Gtk.ResponseType.OK, not enabled or state['loaded'])
+            if state['fade'] is not None:
+                GLib.source_remove(state['fade'])
+            start, target, since = microphone_box.get_opacity(), 1 if enabled else 0.45, time.monotonic()
+            def fade():
+                fraction = min(1, (time.monotonic() - since) / 0.18)
+                microphone_box.set_opacity(start + (target - start) * fraction)
+                if fraction >= 1:
+                    state['fade'] = None
+                    return False
+                return True
+            state['fade'] = GLib.timeout_add(20, fade)
+        audio.connect('toggled', update)
+        def complete(found, error):
+            if not state['alive']:
+                return
+            microphones.append('default', 'System default microphone')
+            for item in found or []:
+                devices[item['id']] = item['device']
+                microphones.append(item['id'], item['name'])
+            saved = self.settings.values['microphone']
+            microphones.set_active_id(saved)
+            missing = microphones.get_active() < 0
+            if missing:
+                microphones.set_active_id('default')
+            state['loaded'] = True
+            info.set_text(('Microphone list unavailable. You can try the system default.' if error else
+                           'Saved microphone is unavailable. Choose an input for this recording.' if missing and saved != 'default' else
+                           'No individual microphones found. You can try the system default.' if not found else
+                           'Choose the microphone to include in this recording.'))
+            update()
+        dialog.show_all()
+        update()
+        self.background(microphone_inventory, complete)
+        try:
+            if dialog.run() != Gtk.ResponseType.OK:
+                return None
+            selected = microphones.get_active_id() or self.settings.values['microphone']
+            return dict(audio=audio.get_active(), microphone=selected,
+                        device=devices.get(selected) if audio.get_active() else None)
+        finally:
+            state['alive'] = False
+            if state['fade'] is not None:
+                GLib.source_remove(state['fade'])
+            self.record_dialog = None
+            dialog.destroy()
 
     def finish_record(self):
         if not self.pipeline or self.finalizing:
@@ -728,6 +862,8 @@ class CameraWindow(Gtk.ApplicationWindow):
         self.stop_pipeline()
         self.recording = self.finalizing = False
         self.record_path = None
+        self.record_audio_device = None
+        self.record_audio_enabled = False
         self.record_button.set_label('Record video')
         self.record_button.get_style_context().remove_class('recording')
         self.lock_capture_settings(False)
@@ -763,7 +899,7 @@ class CameraWindow(Gtk.ApplicationWindow):
             elapsed = int(time.monotonic() - self.started_at)
             self.time_label.set_text(f'● REC  {elapsed // 60:02d}:{elapsed % 60:02d}' + (' · finishing' if self.finalizing else ''))
         else:
-            self.time_label.set_text('PNG / JPEG photos · WebM video')
+            self.time_label.set_text('PNG / JPEG photos · MKV video')
         return True
 
     def save_settings(self):
@@ -815,11 +951,7 @@ class CameraWindow(Gtk.ApplicationWindow):
         mirror = Gtk.CheckButton(label='Mirror preview and saved photos')
         mirror.set_active(self.settings.values['mirror'])
         box.pack_start(mirror, False, False, 0)
-        audio = Gtk.CheckButton(label='Record audio from the default microphone')
-        audio.set_active(self.settings.values['audio'])
-        audio.set_sensitive(not self.recording)
-        box.pack_start(audio, False, False, 0)
-        box.pack_start(label('Video keeps the original camera orientation. Audio uses the system default input.', 'dim'), False, False, 0)
+        box.pack_start(label('Video keeps the original camera orientation. Choose microphone audio when starting a recording.', 'dim'), False, False, 0)
         family = settings_encounter()
         if family:
             mystery = MysteryButton(lambda *_: self.start_easter_egg(family))
@@ -834,7 +966,7 @@ class CameraWindow(Gtk.ApplicationWindow):
                 path.mkdir(parents=True, exist_ok=True)
                 test = reserve_output(str(path), '.lumen-write-test', 'tmp')
                 test.unlink()
-                self.settings.values.update(folder=str(path.resolve()), filename=filename.get_text() or 'Capture_%Y-%m-%d_%H-%M-%S', photo_format=formats.get_active_id() or 'png', mirror=mirror.get_active(), audio=audio.get_active())
+                self.settings.values.update(folder=str(path.resolve()), filename=filename.get_text() or 'Capture_%Y-%m-%d_%H-%M-%S', photo_format=formats.get_active_id() or 'png', mirror=mirror.get_active())
                 self.save_settings()
                 self.frame_seen = None
                 break
