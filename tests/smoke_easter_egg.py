@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import cairo
-from app import CameraApp, MysteryButton, Gtk, GLib, Gdk, APP_ID, running_on_wayland
+from app import CameraApp, MysteryButton, GlitchWarningArt, HIJACK_WARNING, Gtk, GLib, Gdk, APP_ID, running_on_wayland
 
 expect_wayland = len(sys.argv) > 1 and sys.argv[1] == 'wayland'
 
@@ -65,8 +65,59 @@ def test():
                         screen = Gdk.pixbuf_get_from_surface(surface, 0, 0, surface.get_width(), surface.get_height())
                         preview_directory = Path(os.environ.get('RUNNER_TEMP', str(Path(__file__).resolve().parents[2])))
                         screen.savev(str(preview_directory / 'lumen-easter-egg-preview.png'), 'png', [], [])
-                        mystery.clicked()
-                        launch.assert_called_once_with('fedora')
+                        assert mystery.get_event_window().get_cursor() is not None
+                        normal = mystery.build_frames(190, 78)
+                        hover = mystery.build_frames(190, 78, hovered=True)
+                        assert bytes(normal[0].get_data()) != bytes(hover[0].get_data())
+                        mystery.set_state_flags(Gtk.StateFlags.PRELIGHT, False)
+                        hover_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 190, 78)
+                        mystery.draw_glitch(mystery.art, cairo.Context(hover_surface))
+                        assert mystery.frame_size[-1] is True
+                        mystery.unset_state_flags(Gtk.StateFlags.PRELIGHT)
+                        # Exercise real nested GTK dialogs. The child process is
+                        # mocked, so these checks cannot execute a HIJACK game.
+                        for response in (Gtk.ResponseType.CANCEL, Gtk.ResponseType.DELETE_EVENT, Gtk.ResponseType.YES):
+                            animated = []
+                            def answer(response=response):
+                                warning = next((x for x in Gtk.Window.list_toplevels() if x.get_title() == 'Reboot warning'), None)
+                                if warning is None:
+                                    return True
+                                try:
+                                    assert warning.get_transient_for() is dialog
+                                    assert warning.get_modal()
+                                    widgets = list(descendants(warning))
+                                    arts = [x for x in widgets if isinstance(x, GlitchWarningArt)]
+                                    assert len(arts) == 2 and any(x.icon for x in arts)
+                                    assert all(x.animation and x.frame > 0 for x in arts)
+                                    assert HIJACK_WARNING in [x.get_accessible().get_name() for x in arts]
+                                    yes = next(x for x in widgets if isinstance(x, MysteryButton))
+                                    no = warning.get_widget_for_response(Gtk.ResponseType.CANCEL)
+                                    assert yes.get_accessible().get_name() == 'Yes'
+                                    assert not isinstance(no, MysteryButton) and no.get_label() == 'No'
+                                    assert warning.get_default_widget() is no
+                                    launch.assert_not_called()
+                                    animated.extend([*arts, yes])
+                                    if response == Gtk.ResponseType.CANCEL:
+                                        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, warning.get_allocated_width(), warning.get_allocated_height())
+                                        warning.draw(cairo.Context(surface))
+                                        surface.write_to_png(str(preview_directory / 'lumen-hijack-warning-preview.png'))
+                                    if response == Gtk.ResponseType.YES:
+                                        yes.clicked()
+                                    elif response == Gtk.ResponseType.CANCEL:
+                                        no.clicked()
+                                    else:
+                                        warning.response(response)
+                                except Exception as error:
+                                    failure.append(repr(error))
+                                    warning.response(Gtk.ResponseType.CANCEL)
+                                return False
+                            GLib.timeout_add(200, answer)
+                            mystery.clicked()
+                            assert animated and all(x.animation is None for x in animated)
+                            if response == Gtk.ResponseType.YES:
+                                launch.assert_called_once_with('fedora')
+                            else:
+                                launch.assert_not_called()
                         seen.append(mystery)
                     else:
                         assert not buttons
@@ -84,7 +135,7 @@ def test():
                 assert seen[0].animation is None
             GLib.timeout_add(200, inspect)
             w.open_settings()
-        print('PASS: native backend, application identity, icon and Settings eligibility' + ('/animation/cleanup on Wayland' if expect_wayland else ' with no mystery button on X11'), flush=True)
+        print('PASS: native backend, application identity, icon and Settings eligibility' + ('/animation/hover/reboot confirmation/cleanup on Wayland' if expect_wayland else ' with no mystery button on X11'), flush=True)
     except Exception as error:
         failure.append(repr(error))
     w.close_now()

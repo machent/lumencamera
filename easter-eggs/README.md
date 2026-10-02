@@ -1,6 +1,6 @@
 # HIJACK easter egg payloads
 
-Place the **non-rebooting** standalone game files here before building LumenCamera:
+The standalone game files belong here when building LumenCamera:
 
 ```text
 easter-eggs/HIJACK-FEDORA.run
@@ -16,7 +16,8 @@ not install HIJACK's Python or Qt dependencies at launch.
 The installer and native package builders include this directory automatically.
 The games are optional: the webcam app works without them. If a mystery button
 is clicked while its game file is missing, the camera app reports that in its
-status bar. No game binaries are included in this development snapshot.
+status bar. Test installers may omit the game binaries; installing one over an
+existing `.run` installation preserves its game files.
 
 On an installed `.run` version, the equivalent location is
 `${XDG_DATA_HOME:-~/.local/share}/lumen-camera/easter-eggs/`. The usual path is
@@ -27,5 +28,11 @@ Each opening of Settings on KDE Plasma 6 on Wayland with a Fedora/Ubuntu-based s
 an independent 20% chance to reveal the animated `?????` button. Other desktop
 environments, Plasma versions and distribution families never reveal it. X11
 sessions never reveal it either.
-Clicking starts the selected game immediately in its own session/process.
-Closing LumenCamera or Settings does not stop HIJACK.
+The button has a purple highlight and hand cursor on hover. Clicking opens a
+confirmation with a glitching information icon and text warning that the game
+may reboot the computer. This is an interactive HIJACK game, despite the
+fictional "watch this video" wording. Save your work before choosing **Yes**.
+**No**, Escape, and closing the warning do not start the game. Only **Yes**
+launches the selected game in its own session/process. Closing LumenCamera or
+Settings after launching does not stop HIJACK. The game includes flashing
+visuals and may contain loud audio.

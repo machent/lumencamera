@@ -26,7 +26,8 @@ GLib.set_application_name('Lumen Camera')
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gst', '1.0')
 gi.require_version('GstVideo', '1.0')
-from gi.repository import Gtk, Gdk, GdkPixbuf, Gio, GLib, Gst, GstVideo
+gi.require_version('PangoCairo', '1.0')
+from gi.repository import Gtk, Gdk, GdkPixbuf, Gio, GLib, Gst, GstVideo, Pango, PangoCairo
 from easter_egg import settings_encounter, launch_hijack
 
 Gdk.set_program_class(APP_ID)
@@ -119,9 +120,10 @@ def button(text, action, style=None):
 
 class MysteryButton(Gtk.Button):
     """HIJACK-style band tearing and static across the button and its aura."""
-    def __init__(self, action):
+    def __init__(self, action, text='?????'):
         super().__init__()
-        self.get_accessible().set_name('?????')
+        self.text = text
+        self.get_accessible().set_name(text)
         self.get_style_context().add_class('mystery-button')
         self.connect('clicked', action)
         self.art = Gtk.DrawingArea()
@@ -135,6 +137,14 @@ class MysteryButton(Gtk.Button):
         self.connect('map', self.start_animation)
         self.connect('unmap', self.stop_animation)
         self.connect('destroy', self.stop_animation)
+        self.connect('realize', self.set_pointer_cursor)
+        self.connect('state-flags-changed', lambda *_: self.art.queue_draw())
+
+    def set_pointer_cursor(self, widget, *_):
+        cursor = Gdk.Cursor.new_from_name(widget.get_display(), 'pointer')
+        window = self.get_event_window()
+        if window is not None:
+            window.set_cursor(cursor)
 
     def start_animation(self, *_):
         if self.animation is None:
@@ -152,12 +162,14 @@ class MysteryButton(Gtk.Button):
 
     def draw_glitch(self, area, cr):
         size = (area.get_allocated_width(), area.get_allocated_height())
-        if self.frame_size != size:
-            self.frames = self.build_frames(*size)
-            self.frame_size = size
+        hovered = bool(self.get_state_flags() & Gtk.StateFlags.PRELIGHT)
+        key = (*size, hovered)
+        if self.frame_size != key:
+            self.frames = self.build_frames(*size, self.text, hovered)
+            self.frame_size = key
         cr.set_source_surface(self.frames[self.frame % len(self.frames)], 0, 0)
         cr.paint()
-        if self.get_state_flags() & (Gtk.StateFlags.PRELIGHT | Gtk.StateFlags.FOCUSED):
+        if self.get_state_flags() & Gtk.StateFlags.FOCUSED:
             cr.set_source_rgba(0.5, 1, 1, 0.8)
             cr.set_line_width(1)
             cr.rectangle(28.5, 18.5, size[0] - 57, size[1] - 37)
@@ -165,7 +177,7 @@ class MysteryButton(Gtk.Button):
         return False
 
     @staticmethod
-    def build_frames(width, height):
+    def build_frames(width, height, text='?????', hovered=False):
         # Cache 24 small Cairo surfaces, as HIJACK does for its info icon.
         rng = random.Random(0x1AF04D)
         frames = []
@@ -178,10 +190,10 @@ class MysteryButton(Gtk.Button):
             pulse = 0.6 + 0.4 * math.sin(index * math.tau / 24)
             for radius in range(14, 0, -2):
                 for dx, color in [(-3, colors[0]), (3, colors[1])]:
-                    ctx.set_source_rgba(*color, (0.015 + pulse * 0.02) * (1.8 if burst else 1))
+                    ctx.set_source_rgba(*(0.67, 0.28, 1) if hovered else color, (0.015 + pulse * 0.02) * (2.8 if hovered else 1.8 if burst else 1))
                     ctx.rectangle(x - radius + dx, y - radius, w + radius * 2, h + radius * 2)
                     ctx.fill()
-            ctx.set_source_rgb(0.11, 0.055, 0.17)
+            ctx.set_source_rgb(*(0.34, 0.14, 0.52) if hovered else (0.11, 0.055, 0.17))
             ctx.rectangle(x, y, w, h)
             ctx.fill()
             for dx, dy, color in [(-2, -1, colors[0]), (2, 1, colors[1])]:
@@ -191,11 +203,11 @@ class MysteryButton(Gtk.Button):
                 ctx.stroke()
             ctx.select_font_face('monospace', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
             ctx.set_font_size(24)
-            text_width = ctx.text_extents('?????').x_advance
+            text_width = ctx.text_extents(text).x_advance
             for dx, dy, color in [(-3, 0, colors[0]), (3, 1, colors[1]), (0, 0, colors[2])]:
                 ctx.set_source_rgb(*color)
                 ctx.move_to((width - text_width) / 2 + dx, height / 2 + 9 + dy)
-                ctx.show_text('?????')
+                ctx.show_text(text)
             image = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
             ctx = cairo.Context(image)
             ctx.set_source_surface(base, rng.randint(-2, 2), rng.randint(-1, 1))
@@ -218,6 +230,108 @@ class MysteryButton(Gtk.Button):
             for _ in range(3 if burst else 1):
                 ctx.set_source_rgba(*rng.choice(colors[:2]), 0.45)
                 ctx.rectangle(rng.randrange(8, width // 2), rng.randrange(6, height - 6), rng.randint(18, width // 2), 1)
+                ctx.fill()
+            frames.append(image)
+        return frames
+
+
+HIJACK_WARNING = 'Are you sure you want to watch this video?\nThe video may reboot your system... >:)'
+
+
+class GlitchWarningArt(Gtk.DrawingArea):
+    """Animated information icon or lightly torn, accessible warning text."""
+    def __init__(self, icon=False):
+        super().__init__()
+        self.icon = icon
+        self.set_size_request(86 if icon else 442, 92)
+        self.set_valign(Gtk.Align.START)
+        self.get_accessible().set_name('Information' if icon else HIJACK_WARNING)
+        self.frame = 0
+        self.frames = []
+        self.frame_size = None
+        self.animation = None
+        self.pixbuf = None
+        if icon:
+            try:
+                self.pixbuf = Gtk.IconTheme.get_default().load_icon('dialog-information', 72, Gtk.IconLookupFlags.FORCE_SIZE)
+            except GLib.Error:
+                pass
+        self.connect('draw', self.draw_glitch)
+        self.connect('map', self.start_animation)
+        self.connect('unmap', self.stop_animation)
+        self.connect('destroy', self.stop_animation)
+
+    def start_animation(self, *_):
+        if self.animation is None:
+            self.animation = GLib.timeout_add(42, self.animate)
+
+    def stop_animation(self, *_):
+        if self.animation is not None:
+            GLib.source_remove(self.animation)
+            self.animation = None
+
+    def animate(self):
+        self.frame += 1
+        self.queue_draw()
+        return True
+
+    def draw_glitch(self, area, cr):
+        size = (area.get_allocated_width(), area.get_allocated_height())
+        if self.frame_size != size:
+            self.frames = self.build_frames(*size)
+            self.frame_size = size
+        cr.set_source_surface(self.frames[self.frame % len(self.frames)], 0, 0)
+        cr.paint()
+        return False
+
+    def build_frames(self, width, height):
+        rng = random.Random(0x1AF04D)
+        base = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+        ctx = cairo.Context(base)
+        if self.icon:
+            if self.pixbuf:
+                Gdk.cairo_set_source_pixbuf(ctx, self.pixbuf, (width - 72) / 2, 6)
+                ctx.paint()
+            else:
+                ctx.set_source_rgb(0.3, 0.6, 1)
+                ctx.arc(width / 2, 42, 32, 0, math.tau)
+                ctx.fill()
+                ctx.select_font_face('serif', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+                ctx.set_font_size(50)
+                ctx.set_source_rgb(1, 1, 1)
+                ctx.move_to(width / 2 - ctx.text_extents('i').x_advance / 2, 60)
+                ctx.show_text('i')
+        else:
+            layout = PangoCairo.create_layout(ctx)
+            layout.set_font_description(Pango.FontDescription('Monospace Bold 14'))
+            layout.set_width((width - 12) * Pango.SCALE)
+            layout.set_wrap(Pango.WrapMode.WORD_CHAR)
+            layout.set_text(HIJACK_WARNING, -1)
+            for dx, dy, color, alpha in [(-1, 0, (0.1, 0.9, 1), 0.5),
+                                          (1, 1, (1, 0.2, 0.55), 0.5),
+                                          (0, 0, (0.94, 0.92, 1), 1)]:
+                ctx.set_source_rgba(*color, alpha)
+                ctx.move_to(6 + dx, 10 + dy)
+                PangoCairo.show_layout(ctx, layout)
+        frames = []
+        for index in range(24):
+            image = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+            ctx = cairo.Context(image)
+            ctx.set_source_surface(base, rng.randint(-1, 1), rng.randint(-1, 1) if self.icon else 0)
+            ctx.paint()
+            for _ in range(rng.randint(4, 9) if self.icon else 2):
+                y = rng.randrange(height - 5)
+                ctx.save()
+                ctx.rectangle(0, y, width, rng.randint(1, 5) if self.icon else 1)
+                ctx.clip()
+                ctx.set_operator(cairo.OPERATOR_SOURCE)
+                ctx.set_source_surface(base, rng.randint(-9, 9) if self.icon else rng.randint(-2, 2), 0)
+                ctx.paint()
+                ctx.restore()
+            # Keep the main warning legible; static is concentrated on the icon.
+            for _ in range((45 if index in (6, 17) else 12) if self.icon else 3):
+                ctx.set_source_rgba(*rng.choice([(0, 0, 0), (1, 1, 1), (1, 0.1, 0.4)]), 0.7 if self.icon else 0.25)
+                ctx.rectangle(rng.randrange(width), rng.randrange(height), rng.randint(1, 4), 1)
                 ctx.fill()
             frames.append(image)
         return frames
@@ -967,7 +1081,7 @@ class CameraWindow(Gtk.ApplicationWindow):
         box.pack_start(label('Video keeps the original camera orientation. Choose microphone audio when starting a recording.', 'dim'), False, False, 0)
         family = settings_encounter() if running_on_wayland() else None
         if family:
-            mystery = MysteryButton(lambda *_: self.start_easter_egg(family))
+            mystery = MysteryButton(lambda *_: self.start_easter_egg(family, dialog))
             mystery.set_halign(Gtk.Align.END)
             box.pack_start(mystery, False, False, 0)
         dialog.show_all()
@@ -987,7 +1101,38 @@ class CameraWindow(Gtk.ApplicationWindow):
                 self.error('Invalid save folder: ' + str(exc))
         dialog.destroy()
 
-    def start_easter_egg(self, family):
+    def confirm_easter_egg(self, parent=None):
+        dialog = Gtk.Dialog(title='Reboot warning', transient_for=parent or self, modal=True)
+        dialog.set_default_size(642, 230)
+        box = dialog.get_content_area()
+        box.set_spacing(14)
+        box.set_margin_start(24)
+        box.set_margin_end(24)
+        box.set_margin_top(24)
+        box.set_margin_bottom(12)
+        row = Gtk.Box(spacing=18)
+        icon = GlitchWarningArt(icon=True)
+        text = GlitchWarningArt()
+        row.pack_start(icon, False, False, 0)
+        row.pack_start(text, True, True, 0)
+        box.pack_start(row, False, False, 0)
+        yes = MysteryButton(lambda *_: None, 'Yes')
+        dialog.add_action_widget(yes, Gtk.ResponseType.YES)
+        no = dialog.add_button('No', Gtk.ResponseType.CANCEL)
+        no.set_valign(Gtk.Align.CENTER)
+        dialog.get_action_area().set_child_non_homogeneous(no, True)
+        dialog.get_action_area().set_child_non_homogeneous(yes, True)
+        dialog.set_default_response(Gtk.ResponseType.CANCEL)
+        no.grab_default()
+        dialog.show_all()
+        try:
+            return dialog.run() == Gtk.ResponseType.YES
+        finally:
+            dialog.destroy()
+
+    def start_easter_egg(self, family, parent=None):
+        if not self.confirm_easter_egg(parent) or self.closed:
+            return
         try:
             process = launch_hijack(family)
             # Retain/reap the child without terminating it when this window exits.

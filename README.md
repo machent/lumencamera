@@ -4,16 +4,26 @@ A modern webcam app for Fedora and Ubuntu with camera selection, photo capture, 
 
 **Version 1.0** includes the corrected, compact titlebar buttons.
 
-The current `main` branch also includes an **unreleased HIJACK easter egg**:
-opening Settings on KDE Plasma 6 on Wayland and a Fedora/Ubuntu-based system has a 20%
-chance to reveal a `?????` button with animated tearing, static and a glitching
-aura, in the style of HIJACK's information icon. Clicking launches the matching
-non-rebooting HIJACK game immediately as a separate process; closing the camera
-app does not close the game. No confirmation dialog appears. Game files are
-optional and are not included in this snapshot. Add your non-rebooting games at
-`easter-eggs/HIJACK-FEDORA.run` and `easter-eggs/HIJACK-UBUNTU.run` before building.
-See [game file locations](easter-eggs/README.md). The published v1.0 release is
-unchanged. HIJACK may contain flashing visuals and loud audio.
+The current `main` branch includes an **unreleased HIJACK easter egg**:
+opening Settings on KDE Plasma 6 on Wayland and a Fedora/Ubuntu-based system has
+an independent 20% chance to reveal a `?????` button with animated tearing,
+static and a glitching aura. Hovering turns its highlight purple and shows a
+hand cursor. Clicking opens an animated information window with this warning:
+
+> Are you sure you want to watch this video?  
+> The video may reboot your system... >:)
+
+Despite the fictional video wording, this launches the **interactive HIJACK
+game, which can reboot your computer**. Save your work before choosing **Yes**.
+**No**, Escape, or closing the warning cancels without launching anything.
+After confirmation the matching game starts in a separate process; closing
+Lumen Camera does not stop it. HIJACK contains flashing visuals and may contain
+loud audio. The game payloads live in `easter-eggs/HIJACK-FEDORA.run` and
+`easter-eggs/HIJACK-UBUNTU.run`; builds without those optional files still work
+as a webcam app. See [game file locations](easter-eggs/README.md).
+
+**v1.1 is on hold.** The published v1.0 release and package repositories are
+unchanged.
 
 ## Features
 

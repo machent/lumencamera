@@ -38,6 +38,7 @@ jobs:
           name: settings-preview
           path: |
             ${{ runner.temp }}/lumen-easter-egg-preview.png
+            ${{ runner.temp }}/lumen-hijack-warning-preview.png
             ${{ runner.temp }}/lumen-recording-preview.png
           if-no-files-found: error
       - name: Build Debian package and source archive
