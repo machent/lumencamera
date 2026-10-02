@@ -33,6 +33,11 @@ with tempfile.TemporaryDirectory(prefix='lumen-wayland-') as temp:
         assert 'set_app_id("io.github.machent.LumenCamera")' in result.stderr, 'Wayland protocol did not receive the installed desktop entry ID'
         print(result.stdout, end='')
         print('PASS: compositor received LumenCamera app_id for desktop icon lookup')
+        result = subprocess.run([sys.executable, str(ROOT / 'tests/smoke_easter_video.py')],
+                                cwd=ROOT, env=env, capture_output=True, text=True, timeout=25)
+        assert result.returncode == 0, result.stdout + result.stderr[-5000:]
+        print(result.stdout, end='')
+        print('PASS: video resizing, completion and cancellation on native Wayland')
     finally:
         process.terminate()
         process.wait(timeout=5)
