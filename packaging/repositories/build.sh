@@ -30,16 +30,19 @@ if [[ $kind == apt ]]; then
   test "${#debs[@]}" -gt 0
   for deb in "${debs[@]}"; do
     test "$(dpkg-deb -f "$deb" Package)" = lumencamera
-    test "$(dpkg-deb -f "$deb" Architecture)" = all
+    case "$(dpkg-deb -f "$deb" Architecture)" in
+      all|amd64|arm64) ;;
+      *) echo "Unsupported Debian package architecture: $deb" >&2; exit 1 ;;
+    esac
     cp "$deb" "$site/apt/pool/main/l/lumencamera/"
   done
+  filter_script="$(dirname "$(realpath "$0")")/filter_packages.py"
   cd "$site/apt"
-  # The Python package is architecture-independent. Publish indices for the
-  # mainstream Ubuntu desktop architectures and a binary-all index.
+  # Native bundles include x86-64 games. Each index also retains older all packages.
   for arch in amd64 arm64 all; do
     directory="dists/stable/main/binary-$arch"
     mkdir -p "$directory"
-    apt-ftparchive packages pool > "$directory/Packages"
+    apt-ftparchive packages pool | python3 "$filter_script" "$arch" > "$directory/Packages"
     gzip -n -9 -c "$directory/Packages" > "$directory/Packages.gz"
     mkdir -p "$directory/by-hash/SHA256" "$directory/by-hash/SHA512"
     for file in Packages Packages.gz; do
@@ -69,10 +72,14 @@ EOF
 else
   mkdir -p "$site/rpm/packages"
   shopt -s nullglob
-  rpms=("$packages"/*.noarch.rpm)
+  rpms=("$packages"/*.noarch.rpm "$packages"/*.x86_64.rpm)
   test "${#rpms[@]}" -gt 0
   for rpm_file in "${rpms[@]}"; do
     test "$(rpm -qp --qf '%{NAME}' "$rpm_file")" = lumencamera
+    case "$(rpm -qp --qf '%{ARCH}' "$rpm_file")" in
+      noarch|x86_64) ;;
+      *) echo "Unsupported RPM architecture: $rpm_file" >&2; exit 1 ;;
+    esac
     cp "$rpm_file" "$site/rpm/packages/"
   done
   rpmsign --define "_gpg_name $fingerprint" --define "_openpgp_sign_id $fingerprint" --define '_openpgp_sign gpg' --addsign "$site/rpm/packages/"*.rpm

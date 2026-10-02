@@ -37,13 +37,20 @@ jobs:
           mkdir packages
           gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' > tags.txt
           while IFS= read -r tag; do
-            gh release download "$tag" --pattern '*.deb' --pattern '*.noarch.rpm' --pattern SHA256SUMS --dir download
+            gh release download "$tag" --pattern '*.deb' --pattern '*.noarch.rpm' --pattern '*.x86_64.rpm' --pattern SHA256SUMS --dir download
             (cd download && sha256sum --check SHA256SUMS)
-            cp download/*.deb download/*.noarch.rpm packages/
+            shopt -s nullglob
+            debs=(download/*.deb)
+            rpms=(download/*.noarch.rpm download/*.x86_64.rpm)
+            test "${#debs[@]}" -gt 0
+            test "${#rpms[@]}" -gt 0
+            cp "${debs[@]}" "${rpms[@]}" packages/
             rm -rf download
           done < tags.txt
           test -n "$(find packages -name '*.deb' -print -quit)"
-          test -n "$(find packages -name '*.noarch.rpm' -print -quit)"
+          test -n "$(find packages -name '*.rpm' -print -quit)"
+          test -f packages/lumencamera_1.1-1_amd64.deb
+          test -n "$(find packages -name 'lumencamera-1.1-1*.x86_64.rpm' -print -quit)"
       - name: Load signing key or create a disposable validation key
         id: signing
         env:
@@ -66,14 +73,18 @@ jobs:
       - name: Test APT installation on Ubuntu
         shell: bash
         run: |
-          docker run --rm -v "$PWD/site:/repository:ro" ubuntu:24.04 bash -euc '
+          docker run --rm -v "$PWD/site:/repository:ro" -v "$PWD:/source:ro" ubuntu:24.04 bash -euc '
             install -d -m 0755 /etc/apt/keyrings
             cp /repository/lumencamera-signing-key.asc /etc/apt/keyrings/lumencamera.asc
             printf "deb [signed-by=/etc/apt/keyrings/lumencamera.asc] file:/repository/apt stable main\n" > /etc/apt/sources.list.d/lumencamera.list
             apt-get update
             apt-cache policy lumencamera
+            apt-get install -y lumencamera=1.0-1
             apt-get install -y lumencamera
             test "$(dpkg-query -W -f="\${Status}" lumencamera)" = "install ok installed"
+            test "$(dpkg-query -W -f="\${Version}" lumencamera)" = 1.1-1
+            dpkg-query -W v4l2loopback-dkms pkexec
+            /usr/bin/python3 /source/tests/verify_bundle.py /
             /usr/bin/python3 -c "import gi; gi.require_version(\"Gtk\", \"3.0\"); gi.require_version(\"Gst\", \"1.0\"); from gi.repository import Gtk, Gst"
           '
       - name: Sign RPMs, build metadata and test DNF installation on Fedora
@@ -81,10 +92,15 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/source" -v "$RUNNER_TEMP/repository-signing:/signing:ro" -w /source fedora:44 bash -euc '
             dnf install -y rpm-sign createrepo_c gnupg2 python3 gobject-introspection
+            dnf install -y https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-44.noarch.rpm
             bash packaging/repositories/build.sh rpm packages site /signing/private-key.asc
             sed -e "s|https://machent.github.io/lumencamera/rpm|file:///source/site/rpm|" -e "s|https://machent.github.io/lumencamera/lumencamera-signing-key.asc|file:///source/site/lumencamera-signing-key.asc|" site/lumencamera.repo > /etc/yum.repos.d/lumencamera.repo
-            dnf install -y lumencamera
+            dnf install -y lumencamera-1.0-1.fc44.noarch
+            dnf upgrade -y lumencamera
             rpm -q lumencamera
+            test "$(rpm -q --qf "%{VERSION}" lumencamera)" = 1.1
+            rpm -q akmod-v4l2loopback polkit
+            /usr/bin/python3 /source/tests/verify_bundle.py /
             /usr/bin/python3 -c "import gi; gi.require_version(\"Gtk\", \"3.0\"); gi.require_version(\"Gst\", \"1.0\"); from gi.repository import Gtk, Gst"
           '
       - name: Write repository landing page
@@ -124,6 +140,7 @@ jobs:
     needs: deploy
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@v6
       - name: Check published files
         shell: bash
         run: |
@@ -134,7 +151,7 @@ jobs:
           done
       - name: Install through the public APT repository
         run: |
-          docker run --rm ubuntu:24.04 bash -euc '
+          docker run --rm -v "$PWD:/source:ro" ubuntu:24.04 bash -euc '
             apt-get update
             apt-get install -y ca-certificates curl
             install -d -m 0755 /etc/apt/keyrings
@@ -143,11 +160,18 @@ jobs:
             apt-get update
             apt-get install -y lumencamera
             dpkg-query -W lumencamera
+            test "$(dpkg-query -W -f="\${Version}" lumencamera)" = 1.1-1
+            dpkg-query -W v4l2loopback-dkms pkexec
+            /usr/bin/python3 /source/tests/verify_bundle.py /
           '
       - name: Install through the public DNF repository
         run: |
-          docker run --rm fedora:44 bash -euc '
+          docker run --rm -v "$PWD:/source:ro" fedora:44 bash -euc '
+            dnf install -y https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-44.noarch.rpm
             curl -fsSL https://machent.github.io/lumencamera/lumencamera.repo -o /etc/yum.repos.d/lumencamera.repo
             dnf install -y --refresh lumencamera
             rpm -q lumencamera
+            test "$(rpm -q --qf "%{VERSION}" lumencamera)" = 1.1
+            rpm -q akmod-v4l2loopback polkit
+            /usr/bin/python3 /source/tests/verify_bundle.py /
           '

@@ -36,8 +36,10 @@ loud audio. The game payloads live in `easter-eggs/HIJACK-FEDORA.run` and
 `easter-eggs/HIJACK-UBUNTU.run`; builds without those optional files still work
 as a webcam app. See [game file locations](easter-eggs/README.md).
 
-Hosted APT/DNF repositories remain on v1.0 until their next update. Use the
-v1.1 package files below to install this release now.
+The signed APT/DNF repositories include the complete **v1.1 x86-64 bundle**,
+including both HIJACK games and the video. Existing installations can upgrade
+through their package manager; setup and upgrade commands are on the
+[installation website](https://machent.github.io/lumencamera/).
 
 ## Features
 
@@ -65,7 +67,7 @@ module built for the running kernel. For source and `.run` installations, instal
 
 The v1.1 native packages declare `v4l2loopback-dkms` and `pkexec`
 as Debian/Ubuntu dependencies, and `akmod-v4l2loopback` and `polkit` as Fedora
-dependencies. APT/DNF installs these dependencies when installing the v1.1 package files;
+dependencies. APT/DNF installs these dependencies when installing v1.1 from the repositories or package files;
 Fedora needs RPM Fusion Free enabled. Installing a kernel
 module package does not replace the requirement for a module built and loadable
 for the running kernel. The published v1.0 packages do not contain this feature.

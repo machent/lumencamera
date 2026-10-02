@@ -13,11 +13,16 @@
 <body>
 <h1>LumenCamera</h1>
 <p class="intro">Signed packages for Fedora and Ubuntu. Add the repository once, then get updates through your usual package manager.</p>
+<p><strong>v1.1 includes the virtual camera, MKV microphone recording, Camera Defaults, both HIJACK games and the video.</strong></p>
+<p><strong>HIJACK easter egg:</strong> on compatible KDE Plasma 6 Wayland sessions, a mystery button may appear in Settings. After confirmation it plays the video and launches HIJACK, which can reboot your system and contains flashing visuals and loud audio. Save your work first. <a href="https://github.com/machent/lumencamera#readme">Read the full warning and controls in the README.</a></p>
 <h2>Fedora</h2>
-<pre><code>curl -fsSL https://machent.github.io/lumencamera/lumencamera.repo -o /tmp/lumencamera.repo
+<p>Enable <a href="https://rpmfusion.org/Configuration">RPM Fusion Free</a> for the virtual-camera kernel module. DNF installs the module package with LumenCamera.</p>
+<pre><code>sudo dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
+curl -fsSL https://machent.github.io/lumencamera/lumencamera.repo -o /tmp/lumencamera.repo
 sudo install -m 0644 /tmp/lumencamera.repo /etc/yum.repos.d/lumencamera.repo
 sudo dnf install lumencamera</code></pre>
 <h2>Ubuntu</h2>
+<p>APT installs the virtual-camera kernel-module package and the app dependencies automatically.</p>
 <pre><code>sudo install -d -m 0755 /etc/apt/keyrings
 curl -fsSL https://machent.github.io/lumencamera/lumencamera-signing-key.asc -o /tmp/lumencamera.asc
 sudo install -m 0644 /tmp/lumencamera.asc /etc/apt/keyrings/lumencamera.asc
@@ -26,7 +31,14 @@ sudo install -m 0644 /tmp/lumencamera.sources /etc/apt/sources.list.d/lumencamer
 sudo apt update
 sudo apt install lumencamera</code></pre>
 <p>Open Lumen Camera from the application menu, or run <code>lumencamera</code>.</p>
-<p>The repository supports Ubuntu amd64 and arm64 packages and Fedora noarch packages. Camera controls depend on your device.</p>
+<h2>Already installed?</h2>
+<pre><code># Fedora
+sudo dnf upgrade --refresh lumencamera
+
+# Ubuntu
+sudo apt update
+sudo apt install --only-upgrade lumencamera</code></pre>
+<p>The full v1.1 bundle targets x86-64: Ubuntu amd64 and Fedora x86_64. Older architecture-independent v1.0 packages remain available, including for Ubuntu arm64. Camera controls depend on your device. The virtual-camera module must be built and loadable for your running kernel.</p>
 <footer><a href="https://github.com/machent/lumencamera">Source and documentation</a> · <a href="https://github.com/machent/lumencamera/releases">Releases</a> · <a href="signing-key-fingerprint.txt">Signing key fingerprint</a></footer>
 </body>
 </html>
