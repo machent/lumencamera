@@ -32,7 +32,17 @@ The button has a purple highlight and hand cursor on hover. Clicking opens a
 confirmation with a glitching information icon and text warning that the game
 may reboot the computer. This is an interactive HIJACK game, despite the
 fictional "watch this video" wording. Save your work before choosing **Yes**.
-**No**, Escape, and closing the warning do not start the game. Only **Yes**
-launches the selected game in its own session/process. Closing LumenCamera or
+**No**, Escape, and closing the warning do not start the game. **Yes** consumes
+the button for this process, silently animates its CRT shutdown, and turns the
+same window black before smoothly resizing it to the bundled video's 4:3 ratio.
+The video is `easter-eggs/tape-zero.webm`, converted from the supplied
+"DOORS - Tape Zero - Raw Footage [ROBLOX].mp4" to VP8/Vorbis for the existing
+GStreamer dependencies. Keep it alongside the game files when building.
+
+During playback the window has no close button and ignores Alt+F4, Escape, and
+Left Ctrl + Escape. **Right Ctrl + Escape** is the cancellation shortcut: it
+stops the clip and prevents the game launch. Only normal video completion
+launches the selected game in its own session/process. A missing or unplayable
+clip cancels the launch. Fully restart Lumen Camera to allow another encounter. Closing LumenCamera or
 Settings after launching does not stop HIJACK. The game includes flashing
 visuals and may contain loud audio.

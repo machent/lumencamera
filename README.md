@@ -16,8 +16,16 @@ hand cursor. Clicking opens an animated information window with this warning:
 Despite the fictional video wording, this launches the **interactive HIJACK
 game, which can reboot your computer**. Save your work before choosing **Yes**.
 **No**, Escape, or closing the warning cancels without launching anything.
-After confirmation the matching game starts in a separate process; closing
-Lumen Camera does not stop it. HIJACK contains flashing visuals and may contain
+Choosing **Yes** silently collapses the mystery button into a CRT scanline and
+phosphor dot. The button stays unavailable until Lumen Camera is fully restarted,
+even when Settings is reopened. The same warning window turns black, smoothly
+resizes to a compact 4:3 window, and plays the bundled roughly 12-second video
+with its audio. Its close button and Alt+F4 are disabled during playback.
+**Right Ctrl + Escape** cancels the video and prevents HIJACK from starting;
+Escape alone and Left Ctrl + Escape do not cancel it. Only normal video
+completion closes the window and launches the matching game in a separate
+process. Playback failures do not launch it. Closing Lumen Camera afterwards
+does not stop the game. HIJACK contains flashing visuals and may contain
 loud audio. The game payloads live in `easter-eggs/HIJACK-FEDORA.run` and
 `easter-eggs/HIJACK-UBUNTU.run`; builds without those optional files still work
 as a webcam app. See [game file locations](easter-eggs/README.md).

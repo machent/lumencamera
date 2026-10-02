@@ -93,7 +93,7 @@ if [[ "$need_deps" == 1 ]]; then
 fi
 mkdir -p "$APP_DIR" "$BIN_DIR" "$DESKTOP_DIR" "$ICON_DIR"
 # Source and package paths are separate, ready for future system packages.
-for file in app.py core.py easter_egg.py style.css icon.svg README.md LICENSE launcher.sh; do
+for file in app.py core.py easter_egg.py video_easter.py style.css icon.svg README.md LICENSE launcher.sh; do
     install -m 644 "$SOURCE/$file" "$APP_DIR/$file"
 done
 chmod 755 "$APP_DIR/launcher.sh"

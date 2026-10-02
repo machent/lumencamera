@@ -115,7 +115,10 @@ def test():
                             mystery.clicked()
                             assert animated and all(x.animation is None for x in animated)
                             if response == Gtk.ResponseType.YES:
-                                launch.assert_called_once_with('fedora')
+                                launch.assert_not_called()
+                                assert w.easter_used and w.easter_video is not None
+                                assert not mystery.get_sensitive() and mystery.crt_started is not None
+                                w.easter_video.finish(False)
                             else:
                                 launch.assert_not_called()
                         seen.append(mystery)
@@ -135,6 +138,8 @@ def test():
                 assert seen[0].animation is None
             GLib.timeout_add(200, inspect)
             w.open_settings()
+            if expect_wayland:
+                assert encounter.call_count == 1, 'A consumed button must never roll again in this process'
         print('PASS: native backend, application identity, icon and Settings eligibility' + ('/animation/hover/reboot confirmation/cleanup on Wayland' if expect_wayland else ' with no mystery button on X11'), flush=True)
     except Exception as error:
         failure.append(repr(error))

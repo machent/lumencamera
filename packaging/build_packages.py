@@ -49,7 +49,7 @@ def deb(out):
     ver = version()
     with tempfile.TemporaryDirectory(prefix='lumencamera-deb-') as tmp:
         stage = Path(tmp) / 'stage'
-        for name in ('app.py', 'core.py', 'easter_egg.py', 'style.css'):
+        for name in ('app.py', 'core.py', 'easter_egg.py', 'video_easter.py', 'style.css'):
             put(ROOT / name, stage / 'usr/share/lumencamera' / name)
         for file in (ROOT / 'easter-eggs').rglob('*'):
             if file.is_file():

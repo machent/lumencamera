@@ -28,7 +28,7 @@ hardware camera controls and customizable output filenames and folders.
 
 %install
 install -d %{buildroot}%{_datadir}/lumencamera
-for file in app.py core.py easter_egg.py style.css; do
+for file in app.py core.py easter_egg.py video_easter.py style.css; do
     install -m 0644 "$file" %{buildroot}%{_datadir}/lumencamera/
 done
 cp -R easter-eggs %{buildroot}%{_datadir}/lumencamera/

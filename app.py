@@ -29,6 +29,7 @@ gi.require_version('GstVideo', '1.0')
 gi.require_version('PangoCairo', '1.0')
 from gi.repository import Gtk, Gdk, GdkPixbuf, Gio, GLib, Gst, GstVideo, Pango, PangoCairo
 from easter_egg import settings_encounter, launch_hijack
+from video_easter import EasterEggVideo
 
 Gdk.set_program_class(APP_ID)
 Gst.init(None)
@@ -134,6 +135,8 @@ class MysteryButton(Gtk.Button):
         self.frames = []
         self.frame_size = None
         self.animation = None
+        self.crt_started = None
+        self.crt_done = False
         self.connect('map', self.start_animation)
         self.connect('unmap', self.stop_animation)
         self.connect('destroy', self.stop_animation)
@@ -156,12 +159,54 @@ class MysteryButton(Gtk.Button):
             self.animation = None
 
     def animate(self):
+        if self.crt_started is not None:
+            self.crt_done = time.monotonic() - self.crt_started >= 0.42
+            self.art.queue_draw()
+            if self.crt_done:
+                self.animation = None
+                return False
+            return True
         self.frame += 1
         self.art.queue_draw()
         return True
 
+    def shutdown(self):
+        """Silent HIJACK-style scanline collapse; never becomes clickable again."""
+        if self.crt_started is not None:
+            return
+        self.stop_animation()
+        self.crt_started = time.monotonic()
+        self.set_sensitive(False)
+        self.set_can_focus(False)
+        if self.get_event_window() is not None:
+            self.get_event_window().set_cursor(None)
+        self.animation = GLib.timeout_add(16, self.animate)
+        self.art.queue_draw()
+
     def draw_glitch(self, area, cr):
         size = (area.get_allocated_width(), area.get_allocated_height())
+        if self.crt_started is not None:
+            progress = min(1, (time.monotonic() - self.crt_started) / 0.42)
+            if progress >= 1 or not self.frames:
+                return False
+            if progress < 0.58:
+                crush = progress / 0.58
+                height = max(2, size[1] * (1 - crush) ** 3)
+                width = size[0] * (1 + 0.34 * crush)
+            else:
+                crush = (progress - 0.58) / 0.42
+                height = 2
+                width = max(1.5, size[0] * (1 - crush) ** 2)
+            cr.save()
+            cr.translate((size[0] - width) / 2, (size[1] - height) / 2)
+            cr.scale(width / size[0], height / size[1])
+            cr.set_source_surface(self.frames[self.frame % len(self.frames)], 0, 0)
+            cr.paint_with_alpha(1 - progress * 0.72)
+            cr.set_source_rgba(1, 0.96, 0.92, 0.57 * (1 - progress))
+            cr.rectangle(0, 0, *size)
+            cr.fill()
+            cr.restore()
+            return False
         hovered = bool(self.get_state_flags() & Gtk.StateFlags.PRELIGHT)
         key = (*size, hovered)
         if self.frame_size != key:
@@ -416,6 +461,8 @@ class CameraWindow(Gtk.ApplicationWindow):
         self.finalize_timer = None
         self.updating = False
         self.defaults_busy = False
+        self.easter_used = False
+        self.easter_video = None
 
         self.connect('delete-event', self.on_close)
         header = Gtk.HeaderBar(title='Lumen Camera', subtitle='Photo & video studio', show_close_button=False)
@@ -1045,6 +1092,7 @@ class CameraWindow(Gtk.ApplicationWindow):
 
     def open_settings(self, *_):
         dialog = Gtk.Dialog(title='Settings', transient_for=self, modal=True)
+        dialog.connect('delete-event', lambda *_: self.easter_video is not None)
         dialog.add_buttons('Cancel', Gtk.ResponseType.CANCEL, 'Save', Gtk.ResponseType.OK)
         dialog.set_default_size(540, 380)
         box = dialog.get_content_area()
@@ -1079,9 +1127,9 @@ class CameraWindow(Gtk.ApplicationWindow):
         mirror.set_active(self.settings.values['mirror'])
         box.pack_start(mirror, False, False, 0)
         box.pack_start(label('Video keeps the original camera orientation. Choose microphone audio when starting a recording.', 'dim'), False, False, 0)
-        family = settings_encounter() if running_on_wayland() else None
+        family = settings_encounter() if running_on_wayland() and not self.easter_used else None
         if family:
-            mystery = MysteryButton(lambda *_: self.start_easter_egg(family, dialog))
+            mystery = MysteryButton(lambda item: self.start_easter_egg(family, dialog, item))
             mystery.set_halign(Gtk.Align.END)
             box.pack_start(mystery, False, False, 0)
         dialog.show_all()
@@ -1125,13 +1173,29 @@ class CameraWindow(Gtk.ApplicationWindow):
         dialog.set_default_response(Gtk.ResponseType.CANCEL)
         no.grab_default()
         dialog.show_all()
-        try:
-            return dialog.run() == Gtk.ResponseType.YES
-        finally:
-            dialog.destroy()
+        if dialog.run() == Gtk.ResponseType.YES:
+            return dialog
+        dialog.destroy()
+        return None
 
-    def start_easter_egg(self, family, parent=None):
-        if not self.confirm_easter_egg(parent) or self.closed:
+    def start_easter_egg(self, family, parent=None, mystery=None):
+        if self.easter_used or self.closed:
+            return
+        dialog = self.confirm_easter_egg(parent)
+        if dialog is None:
+            return
+        if self.closed:
+            dialog.destroy()
+            return
+        self.easter_used = True
+        if mystery is not None:
+            mystery.shutdown()
+        self.easter_video = EasterEggVideo(dialog, lambda completed: self.finish_easter_video(family, completed), self.status)
+        self.easter_video.start()
+
+    def finish_easter_video(self, family, completed):
+        self.easter_video = None
+        if not completed or self.closed:
             return
         try:
             process = launch_hijack(family)
@@ -1143,6 +1207,8 @@ class CameraWindow(Gtk.ApplicationWindow):
             self.status(str(exc))
 
     def on_close(self, *_):
+        if self.easter_video is not None:
+            return True
         if self.recording or self.finalizing:
             self.closing = True
             if not self.finalizing:
@@ -1155,6 +1221,8 @@ class CameraWindow(Gtk.ApplicationWindow):
         if self.closed:
             return
         self.closed = True
+        if self.easter_video is not None:
+            self.easter_video.finish(False)
         self.stop_pipeline()
         for source in self.debounce.values():
             GLib.source_remove(source)

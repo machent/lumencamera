@@ -20,7 +20,7 @@ jobs:
           sudo apt-get install -y python3 python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good v4l-utils xvfb dpkg pulseaudio pulseaudio-utils weston x11-utils
       - name: Check syntax and configuration logic
         run: |
-          /usr/bin/python3 -m py_compile app.py core.py easter_egg.py packaging/build_packages.py
+          /usr/bin/python3 -m py_compile app.py core.py easter_egg.py video_easter.py packaging/build_packages.py
           /usr/bin/python3 -m unittest discover -s tests -v
           bash -n install.sh launcher.sh packaging/lumencamera
       - name: Exercise camera and recording with synthetic devices
@@ -31,6 +31,8 @@ jobs:
         run: env XDG_SESSION_TYPE=x11 GDK_BACKEND=wayland xvfb-run -a /usr/bin/python3 tests/smoke_easter_egg.py x11
       - name: Check native Wayland, desktop identity and animated Settings easter egg
         run: /usr/bin/python3 tests/run_wayland.py
+      - name: Check video completion, emergency shortcut and failed playback
+        run: xvfb-run -a /usr/bin/python3 tests/smoke_easter_video.py
       - name: Exercise Camera Defaults confirmation and driver responses
         run: xvfb-run -a /usr/bin/python3 tests/smoke_defaults.py
       - uses: actions/upload-artifact@v4
@@ -39,6 +41,7 @@ jobs:
           path: |
             ${{ runner.temp }}/lumen-easter-egg-preview.png
             ${{ runner.temp }}/lumen-hijack-warning-preview.png
+            ${{ runner.temp }}/lumen-easter-video-preview.png
             ${{ runner.temp }}/lumen-recording-preview.png
           if-no-files-found: error
       - name: Build Debian package and source archive
