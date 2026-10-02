@@ -1,14 +1,13 @@
 # Lumen Camera
 
-The current `main` branch includes an **unreleased virtual camera**. Start/stop
-sharing the preview with Discord or another camera app using the third capture
-button. The published v1.0 release and APT/DNF packages are unchanged.
+**Version 1.1** includes virtual camera output, Matroska recording with optional
+microphone audio, Camera Defaults, native X11/Wayland support, and the bundled
+HIJACK easter egg. Download the `.deb` or `.rpm` from
+[the v1.1 release](https://github.com/machent/lumencamera/releases/tag/v1.1).
 
 A modern webcam app for Fedora and Ubuntu with camera selection, photo capture, video recording, adjustable camera controls, and customizable filenames and save folders.
 
-**Version 1.0** includes the corrected, compact titlebar buttons.
-
-The current `main` branch includes an **unreleased HIJACK easter egg**:
+**HIJACK easter egg (included in v1.1):**
 opening Settings on KDE Plasma 6 on Wayland and a Fedora/Ubuntu-based system has
 an independent 20% chance to reveal a `?????` button with animated tearing,
 static and a glitching aura. Hovering turns its highlight purple and shows a
@@ -37,8 +36,8 @@ loud audio. The game payloads live in `easter-eggs/HIJACK-FEDORA.run` and
 `easter-eggs/HIJACK-UBUNTU.run`; builds without those optional files still work
 as a webcam app. See [game file locations](easter-eggs/README.md).
 
-**v1.1 is on hold.** The published v1.0 release and package repositories are
-unchanged.
+Hosted APT/DNF repositories remain on v1.0 until their next update. Use the
+v1.1 package files below to install this release now.
 
 ## Features
 
@@ -64,10 +63,10 @@ module built for the running kernel. For source and `.run` installations, instal
 [RPM Fusion Free](https://rpmfusion.org/Configuration) on Fedora. PolicyKit's
 `pkexec` command is needed to load an installed module from the app.
 
-Native package builds from this branch declare `v4l2loopback-dkms` and `pkexec`
+The v1.1 native packages declare `v4l2loopback-dkms` and `pkexec`
 as Debian/Ubuntu dependencies, and `akmod-v4l2loopback` and `polkit` as Fedora
-dependencies. APT/DNF will install those dependencies when the next package
-version is available; Fedora needs RPM Fusion Free enabled. Installing a kernel
+dependencies. APT/DNF installs these dependencies when installing the v1.1 package files;
+Fedora needs RPM Fusion Free enabled. Installing a kernel
 module package does not replace the requirement for a module built and loadable
 for the running kernel. The published v1.0 packages do not contain this feature.
 
@@ -129,20 +128,20 @@ Ubuntu: `sudo apt install lumencamera`
 Open **Lumen Camera** from the application menu or run `lumencamera`.
 Future versions arrive through your usual system updates.
 
-## Install version 1.0 from a package file
+## Install version 1.1 from a package file
 
-Download the package for your distribution from [GitHub Releases](https://github.com/machent/lumencamera/releases/tag/v1.0).
+Download the package for your distribution from [GitHub Releases](https://github.com/machent/lumencamera/releases/tag/v1.1).
 
 Ubuntu / Debian, from the download folder:
 
 ```bash
-sudo apt install ./lumencamera_1.0-1_all.deb
+sudo apt install ./lumencamera_1.1-1_all.deb
 ```
 
 Fedora, from the download folder:
 
 ```bash
-sudo dnf install ./lumencamera-1.0-1*.noarch.rpm
+sudo dnf install ./lumencamera-1.1-1*.noarch.rpm
 ```
 
 Open Lumen Camera from the application menu or run `lumencamera`. The release includes SHA-256 checksums. Signed APT and DNF repositories are also available as described above.

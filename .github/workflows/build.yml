@@ -49,15 +49,13 @@ jobs:
           if-no-files-found: error
       - name: Build Debian package and source archive
         run: |
-          # Package validation uses the camera and fake-game tests only.
-          mkdir -p "$RUNNER_TEMP/lumen-game-files"
-          for game in easter-eggs/*.run; do
-            [ ! -f "$game" ] || mv "$game" "$RUNNER_TEMP/lumen-game-files/"
-          done
           python3 packaging/build_packages.py deb
           python3 packaging/build_packages.py source
           dpkg-deb --info dist/*.deb
           dpkg-deb --contents dist/*.deb
+          test "$(dpkg-deb -f dist/*.deb Version)" = "$(python3 -c 'from core import VERSION; print(VERSION)')-1"
+          dpkg-deb --extract dist/*.deb "$RUNNER_TEMP/lumen-deb-extracted"
+          python3 tests/verify_bundle.py "$RUNNER_TEMP/lumen-deb-extracted"
       - uses: actions/upload-artifact@v4
         with:
           name: deb-and-source
@@ -70,18 +68,106 @@ jobs:
       - uses: actions/checkout@v6
       - name: Build RPM in Fedora
         run: |
-          mkdir -p "$RUNNER_TEMP/lumen-game-files"
-          for game in easter-eggs/*.run; do
-            [ ! -f "$game" ] || mv "$game" "$RUNNER_TEMP/lumen-game-files/"
-          done
           docker run --rm -v "$PWD:/source" -w /source fedora:latest bash -euc '
-            dnf install -y rpm-build python3 tar gzip
+            dnf install -y rpm-build python3 tar gzip cpio
             python3 packaging/build_packages.py rpm
             rpm -qp --info dist/*.noarch.rpm
             rpm -qp --requires dist/*.noarch.rpm
+            test "$(rpm -qp --queryformat '%{VERSION}' dist/*.noarch.rpm)" = "$(python3 -c "from core import VERSION; print(VERSION)")"
+            mkdir -p /tmp/lumen-rpm-extracted
+            rpm2cpio dist/*.noarch.rpm | (cd /tmp/lumen-rpm-extracted && cpio -idm --quiet)
+            python3 tests/verify_bundle.py /tmp/lumen-rpm-extracted
           '
       - uses: actions/upload-artifact@v4
         with:
           name: rpm-and-srpm
           path: dist/*.rpm
           if-no-files-found: error
+
+  release:
+    needs: [ubuntu, fedora]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.head_commit.message == 'Release v1.1'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    concurrency:
+      group: release-1.1
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: deb-and-source
+          path: artifacts/debian
+      - uses: actions/download-artifact@v4
+        with:
+          name: rpm-and-srpm
+          path: artifacts/fedora
+      - name: Prepare verified package assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir packages
+          shopt -s nullglob
+          deb=(artifacts/debian/*.deb)
+          rpm=(artifacts/fedora/*.noarch.rpm)
+          test "${#deb[@]}" -eq 1
+          test "${#rpm[@]}" -eq 1
+          test "$(dpkg-deb -f "${deb[0]}" Package)" = lumencamera
+          test "$(dpkg-deb -f "${deb[0]}" Version)" = 1.1-1
+          test "$(dpkg-deb -f "${deb[0]}" Architecture)" = all
+          cp "${deb[0]}" "${rpm[0]}" packages/
+          (cd packages && sha256sum *.deb *.rpm > SHA256SUMS)
+      - name: Prepare release notes
+        shell: bash
+        run: |
+          cat > release-notes.md <<'NOTES'
+          LumenCamera v1.1 for Fedora and Ubuntu, with all current features and bundled easter-egg assets.
+
+          - Start/stop a virtual camera beside Record video to share the live preview in Discord and other camera apps, while adjusting camera controls or recording.
+          - Reliable YUY2 virtual-camera output at 30 fps, preview mirroring, stable output during camera changes, and terminal diagnostics.
+          - Record Matroska (.mkv) video with an optional, selectable microphone.
+          - Camera Defaults with confirmation, configurable filenames/folders, PNG/JPEG photos, and supported focus, autofocus, sharpness, exposure and other controls.
+          - Native X11/Wayland selection and corrected window identity/icon.
+          - Bundled HIJACK-FEDORA.run, HIJACK-UBUNTU.run and video. The animated Settings easter egg appears only on compatible KDE Plasma 6 Wayland sessions on Fedora/Ubuntu-based systems, with a 20% chance.
+
+          **HIJACK warning:** The easter egg launches an interactive game that can reboot your computer, contains flashing visuals and may play loud audio. Save your work before choosing Yes in its confirmation window. HIJACK starts at video position 0:09.50; the video closes at 0:10.90. Right Ctrl + Escape cancels the video and a pending launch before 0:09.50. Once launched, HIJACK runs separately and closing LumenCamera does not stop it.
+
+          **Ubuntu / Debian:** download the .deb and run:
+          ```bash
+          sudo apt install ./lumencamera_1.1-1_all.deb
+          ```
+
+          **Fedora:** enable RPM Fusion Free (https://rpmfusion.org/Configuration), download the .noarch.rpm and run:
+          ```bash
+          sudo dnf install ./lumencamera-1.1-1*.noarch.rpm
+          ```
+
+          Launch Lumen Camera from the application menu or run lumencamera.
+
+          The native packages declare the virtual-camera dependencies: v4l2loopback-dkms and pkexec on Ubuntu; akmod-v4l2loopback and polkit on Fedora. The kernel module must be built and loadable for your running kernel. OBS is not required.
+
+          SHA256SUMS covers both packages. Full runtime and bundled-asset hashes/executable permissions are checked after package extraction; webcam/UI/recording/virtual-camera tests and Fedora/Ubuntu package builds pass before publication. Hardware camera controls depend on your device.
+
+          This release publishes package files; hosted APT/DNF repositories will be updated separately.
+          NOTES
+      - name: Publish v1.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v1.1 --json isDraft > existing.json 2>/dev/null; then
+            jq -e '.isDraft == true' existing.json
+            test "$(gh api "repos/$GH_REPO/git/ref/tags/v1.1" --jq .object.sha)" = "$RELEASE_COMMIT"
+            gh release upload v1.1 packages/* --clobber
+            gh release edit v1.1 --title v1.1 --notes-file release-notes.md
+          else
+            gh release create v1.1 packages/* --target "$RELEASE_COMMIT" --title v1.1 --notes-file release-notes.md --draft
+          fi
+          gh release view v1.1 --json assets > release.json
+          jq -e '.assets | length == 3 and all(.[]; .size > 0)' release.json
+          test "$(gh api "repos/$GH_REPO/git/ref/tags/v1.1" --jq .object.sha)" = "$RELEASE_COMMIT"
+          gh release edit v1.1 --draft=false --latest

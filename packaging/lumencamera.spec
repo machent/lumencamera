@@ -1,5 +1,5 @@
 Name:           lumencamera
-Version:        1.0
+Version:        1.1
 Release:        1%{?dist}
 Summary:        Webcam photos, videos and hardware camera controls
 License:        GPL-3.0-only
@@ -51,5 +51,10 @@ install -D -m 0644 icon.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/
 %{_datadir}/icons/hicolor/scalable/apps/io.github.machent.LumenCamera.svg
 
 %changelog
+* Fri Oct 02 2026 Lumen Camera contributors - 1.1-1
+- Add virtual camera output, MKV microphone recording and Camera Defaults.
+- Bundle both HIJACK games and the video with the warning and playback flow.
+- Require the virtual camera kernel-module packages and PolicyKit.
+
 * Thu Oct 01 2026 Lumen Camera contributors - 1.0-1
 - Initial RPM release, including compact titlebar window controls.
