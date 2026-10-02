@@ -6,6 +6,7 @@ import re
 import shlex
 import subprocess
 from pathlib import Path
+from core import session_backend
 
 GAME_FILES = {
     'fedora': 'HIJACK-FEDORA.run',
@@ -33,6 +34,8 @@ def system_family(os_release=None):
 
 def eligible_family(env=None, os_release=None):
     env = os.environ if env is None else env
+    if session_backend(env) != 'wayland':
+        return None
     desktop = re.split(r'[:;]', env.get('XDG_CURRENT_DESKTOP', '').lower())
     if 'kde' not in desktop and env.get('KDE_FULL_SESSION', '').lower() != 'true':
         return None
@@ -62,7 +65,7 @@ def settings_encounter(env=None, os_release=None, draw=None):
 def launch_hijack(family, root=None):
     # Revalidate immediately before launch, including when invoked outside UI.
     if family not in GAME_FILES or eligible_family() != family:
-        raise RuntimeError('HIJACK is available on Fedora/Ubuntu systems using KDE 6.')
+        raise RuntimeError('HIJACK is available on Fedora/Ubuntu systems using KDE 6 on Wayland.')
     root = Path(root) if root else Path(__file__).resolve().parent
     game = root / 'easter-eggs' / GAME_FILES[family]
     if not game.is_file():

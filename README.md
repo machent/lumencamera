@@ -5,7 +5,7 @@ A modern webcam app for Fedora and Ubuntu with camera selection, photo capture, 
 **Version 1.0** includes the corrected, compact titlebar buttons.
 
 The current `main` branch also includes an **unreleased HIJACK easter egg**:
-opening Settings on KDE Plasma 6 and a Fedora/Ubuntu-based system has a 20%
+opening Settings on KDE Plasma 6 on Wayland and a Fedora/Ubuntu-based system has a 20%
 chance to reveal a `?????` button with animated tearing, static and a glitching
 aura, in the style of HIJACK's information icon. Clicking launches the matching
 non-rebooting HIJACK game immediately as a separate process; closing the camera
@@ -78,6 +78,11 @@ sudo apt install python3 python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-gstre
 ```
 
 Use the system Python interpreter, which provides the distribution's GI bindings. The app supports X11 and Wayland sessions with direct access to V4L2 camera devices.
+
+The app automatically uses native X11 in an X11 login session and native Wayland
+in a Wayland login session. The mystery button is never shown on X11; on Wayland
+its existing Plasma 6, distribution and 20% chance requirements still apply.
+The window identity matches the installed desktop entry for the Lumen Camera icon.
 
 ## Build the user installer
 

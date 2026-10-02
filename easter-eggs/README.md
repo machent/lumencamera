@@ -23,8 +23,9 @@ On an installed `.run` version, the equivalent location is
 `~/.local/share/lumen-camera/easter-eggs/`. Native packages use
 `/usr/share/lumencamera/easter-eggs/`.
 
-Each opening of Settings on KDE Plasma 6 with a Fedora/Ubuntu-based system has
+Each opening of Settings on KDE Plasma 6 on Wayland with a Fedora/Ubuntu-based system has
 an independent 20% chance to reveal the animated `?????` button. Other desktop
-environments, Plasma versions and distribution families never reveal it.
+environments, Plasma versions and distribution families never reveal it. X11
+sessions never reveal it either.
 Clicking starts the selected game immediately in its own session/process.
 Closing LumenCamera or Settings does not stop HIJACK.

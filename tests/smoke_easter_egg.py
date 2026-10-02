@@ -4,7 +4,10 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app import CameraApp, MysteryButton, Gtk, GLib, Gdk
+import cairo
+from app import CameraApp, MysteryButton, Gtk, GLib, Gdk, APP_ID, running_on_wayland
+
+expect_wayland = len(sys.argv) > 1 and sys.argv[1] == 'wayland'
 
 app = CameraApp(demo=True)
 failure = []
@@ -22,7 +25,20 @@ def test():
         return True
     w = app.window
     try:
-        with patch('app.settings_encounter', side_effect=['fedora', None]), \
+        assert running_on_wayland() == expect_wayland
+        assert os.environ['GDK_BACKEND'] == ('wayland' if expect_wayland else 'x11')
+        assert GLib.get_prgname() == APP_ID
+        assert Gdk.get_program_class() == APP_ID
+        assert Gtk.Window.get_default_icon_list(), 'Explicit window icon must load'
+        if not expect_wayland:
+            import subprocess
+            import gi
+            gi.require_version('GdkX11', '3.0')
+            from gi.repository import GdkX11
+            xid = GdkX11.X11Window.get_xid(w.get_window())
+            properties = subprocess.check_output(['xprop', '-id', str(xid), 'WM_CLASS', '_NET_WM_ICON'], text=True)
+            assert APP_ID in properties and 'not found' not in properties
+        with patch('app.settings_encounter', side_effect=['fedora', None]) as encounter, \
              patch('app.launch_hijack') as launch:
             launch.return_value.poll.return_value = 0
             seen = []
@@ -30,7 +46,7 @@ def test():
                 dialog = next(x for x in Gtk.Window.list_toplevels() if x.get_title() == 'Settings')
                 try:
                     buttons = [x for x in descendants(dialog) if isinstance(x, MysteryButton)]
-                    if not seen:
+                    if not seen and expect_wayland:
                         assert len(buttons) == 1
                         mystery = buttons[0]
                         assert mystery.animation and mystery.frame > 0
@@ -42,7 +58,11 @@ def test():
                         # The aura above the button face must move, too.
                         aura = [x[5 * stride:15 * stride] for x in frames]
                         assert len(set(aura)) > 12, 'Aura must glitch independently'
-                        screen = Gdk.pixbuf_get_from_window(dialog.get_window(), 0, 0, dialog.get_allocated_width(), dialog.get_allocated_height())
+                        # Wayland intentionally does not allow arbitrary window
+                        # screenshots; render the GTK widget into our surface.
+                        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, dialog.get_allocated_width(), dialog.get_allocated_height())
+                        dialog.draw(cairo.Context(surface))
+                        screen = Gdk.pixbuf_get_from_surface(surface, 0, 0, surface.get_width(), surface.get_height())
                         preview_directory = Path(os.environ.get('RUNNER_TEMP', str(Path(__file__).resolve().parents[2])))
                         screen.savev(str(preview_directory / 'lumen-easter-egg-preview.png'), 'png', [], [])
                         mystery.clicked()
@@ -50,6 +70,9 @@ def test():
                         seen.append(mystery)
                     else:
                         assert not buttons
+                        if not expect_wayland:
+                            encounter.assert_not_called()
+                            launch.assert_not_called()
                 except Exception as error:
                     failure.append(repr(error))
                 finally:
@@ -57,10 +80,11 @@ def test():
                 return False
             GLib.timeout_add(450, inspect)
             w.open_settings()
-            assert seen[0].animation is None
+            if expect_wayland:
+                assert seen[0].animation is None
             GLib.timeout_add(200, inspect)
             w.open_settings()
-        print('Settings eligibility, animation, immediate launch and cleanup passed', flush=True)
+        print('PASS: native backend, application identity, icon and Settings eligibility' + ('/animation/cleanup on Wayland' if expect_wayland else ' with no mystery button on X11'), flush=True)
     except Exception as error:
         failure.append(repr(error))
     w.close_now()

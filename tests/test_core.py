@@ -3,9 +3,24 @@ import tempfile
 import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from core import Settings, reserve_output, parse_controls, parse_modes, capture_source, restore_camera_defaults
+from core import Settings, reserve_output, parse_controls, parse_modes, capture_source, restore_camera_defaults, session_backend, configure_display_backend
 
 class CoreTests(unittest.TestCase):
+    def test_session_backend_and_native_selection(self):
+        for environment, expected in [
+                ({'XDG_SESSION_TYPE': 'x11', 'WAYLAND_DISPLAY': 'stale', 'DISPLAY': ':0'}, 'x11'),
+                ({'XDG_SESSION_TYPE': 'wayland', 'DISPLAY': ':0', 'GDK_BACKEND': 'x11'}, 'wayland'),
+                ({'WAYLAND_DISPLAY': 'wayland-1', 'DISPLAY': ':0'}, 'wayland'),
+                ({'DISPLAY': ':0', 'GDK_BACKEND': 'wayland'}, 'x11'),
+                ({}, None)]:
+            with self.subTest(environment=environment):
+                env = dict(environment)
+                self.assertEqual(session_backend(env), expected)
+                self.assertEqual(configure_display_backend(env), expected)
+                if expected:
+                    self.assertEqual(env['GDK_BACKEND'], expected)
+                else:
+                    self.assertNotIn('GDK_BACKEND', env)
     def test_collision_and_safe_filename(self):
         with tempfile.TemporaryDirectory() as tmp:
             a = reserve_output(tmp, '../same/name', 'png')

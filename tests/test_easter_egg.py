@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from easter_egg import eligible_family, settings_encounter, launch_hijack
 
-KDE6 = {'XDG_CURRENT_DESKTOP': 'KDE', 'KDE_SESSION_VERSION': '6'}
+KDE6 = {'XDG_CURRENT_DESKTOP': 'KDE', 'KDE_SESSION_VERSION': '6', 'XDG_SESSION_TYPE': 'wayland'}
 
 
 class EasterEggTests(unittest.TestCase):
@@ -28,9 +28,16 @@ class EasterEggTests(unittest.TestCase):
 
     def test_missing_version_uses_running_desktop_version_command(self):
         with patch('easter_egg.subprocess.run', return_value=subprocess.CompletedProcess([], 0, 'plasmashell 6.7.0\n', '')):
-            self.assertEqual(eligible_family({'XDG_CURRENT_DESKTOP': 'KDE'}, 'ID=fedora'), 'fedora')
+            self.assertEqual(eligible_family({'XDG_CURRENT_DESKTOP': 'KDE', 'XDG_SESSION_TYPE': 'wayland'}, 'ID=fedora'), 'fedora')
         with patch('easter_egg.subprocess.run', side_effect=FileNotFoundError):
-            self.assertIsNone(eligible_family({'XDG_CURRENT_DESKTOP': 'KDE'}, 'ID=fedora'))
+            self.assertIsNone(eligible_family({'XDG_CURRENT_DESKTOP': 'KDE', 'XDG_SESSION_TYPE': 'wayland'}, 'ID=fedora'))
+
+    def test_x11_never_rolls_even_with_kde6_and_a_wayland_variable(self):
+        env = dict(KDE6, XDG_SESSION_TYPE='x11', WAYLAND_DISPLAY='wayland-0', DISPLAY=':0')
+        with patch('easter_egg.random.random') as draw:
+            self.assertIsNone(settings_encounter(env, 'ID=fedora'))
+            draw.assert_not_called()
+        self.assertIsNone(eligible_family({'XDG_CURRENT_DESKTOP': 'KDE', 'KDE_SESSION_VERSION': '6'}, 'ID=fedora'))
 
     def test_each_opening_rolls_and_exact_boundary(self):
         values = iter([0.199999, 0.2, 0.0, 0.99])

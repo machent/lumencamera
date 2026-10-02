@@ -11,6 +11,28 @@ VERSION = '1.0'
 APP_ID = 'io.github.machent.LumenCamera'
 
 
+def session_backend(env=None):
+    """Prefer the login session type; DISPLAY also exists in Wayland sessions."""
+    env = os.environ if env is None else env
+    session = env.get('XDG_SESSION_TYPE', '').strip().lower()
+    if session in ('wayland', 'x11'):
+        return session
+    if env.get('WAYLAND_DISPLAY'):
+        return 'wayland'
+    if env.get('DISPLAY'):
+        return 'x11'
+    return None
+
+
+def configure_display_backend(env=None):
+    """Select one native GTK backend before GTK initializes its display."""
+    env = os.environ if env is None else env
+    backend = session_backend(env)
+    if backend:
+        env['GDK_BACKEND'] = backend
+    return backend
+
+
 def default_settings():
     pictures = Path.home() / 'Pictures'
     return dict(folder=str(pictures / 'Lumen Camera'), filename='Capture_%Y-%m-%d_%H-%M-%S',

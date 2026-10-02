@@ -12,17 +12,30 @@ import sys
 import time
 from pathlib import Path
 
+from core import Settings, VERSION, APP_ID, reserve_output, parse_controls, parse_modes, mode_id, mode_label, capture_source, restore_camera_defaults, configure_display_backend
+configure_display_backend()
+
 import gi
 import cairo
 
+from gi.repository import GLib
+# GTK3 uses the program name for Wayland's app_id. It must match the installed
+# desktop entry basename so Plasma can resolve the application's icon.
+GLib.set_prgname(APP_ID)
+GLib.set_application_name('Lumen Camera')
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gst', '1.0')
 gi.require_version('GstVideo', '1.0')
 from gi.repository import Gtk, Gdk, GdkPixbuf, Gio, GLib, Gst, GstVideo
-from core import Settings, VERSION, APP_ID, reserve_output, parse_controls, parse_modes, mode_id, mode_label, capture_source, restore_camera_defaults
 from easter_egg import settings_encounter, launch_hijack
 
+Gdk.set_program_class(APP_ID)
 Gst.init(None)
+
+
+def running_on_wayland():
+    display = Gdk.Display.get_default()
+    return display is not None and display.__gtype__.name == 'GdkWaylandDisplay'
 
 
 def v4l(device, *args):
@@ -952,7 +965,7 @@ class CameraWindow(Gtk.ApplicationWindow):
         mirror.set_active(self.settings.values['mirror'])
         box.pack_start(mirror, False, False, 0)
         box.pack_start(label('Video keeps the original camera orientation. Choose microphone audio when starting a recording.', 'dim'), False, False, 0)
-        family = settings_encounter()
+        family = settings_encounter() if running_on_wayland() else None
         if family:
             mystery = MysteryButton(lambda *_: self.start_easter_egg(family))
             mystery.set_halign(Gtk.Align.END)
@@ -1012,6 +1025,16 @@ class CameraApp(Gtk.Application):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE if demo else Gio.ApplicationFlags.FLAGS_NONE)
         self.demo = demo
         self.window = None
+
+    def do_startup(self):
+        Gtk.Application.do_startup(self)
+        Gtk.Window.set_default_icon_name(APP_ID)
+        try:
+            # X11 supports an explicit window icon, including source checkouts.
+            # Wayland resolves its taskbar icon from APP_ID and the desktop file.
+            Gtk.Window.set_default_icon_from_file(str(Path(__file__).with_name('icon.svg')))
+        except GLib.Error:
+            pass
 
     def do_activate(self):
         if self.window is None:

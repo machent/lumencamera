@@ -7,4 +7,4 @@ Icon=io.github.machent.LumenCamera
 Terminal=false
 Categories=AudioVideo;Video;Photography;
 StartupNotify=true
-StartupWMClass=Lumen Camera
+StartupWMClass=io.github.machent.LumenCamera

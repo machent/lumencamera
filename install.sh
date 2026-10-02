@@ -114,7 +114,7 @@ def desktop_quote(value):
     # Desktop Exec escaping is different from shell escaping.
     value = value.replace('\\', '\\\\\\\\').replace('"', '\\"').replace('`', '\\`').replace('$', '\\$').replace('%', '%%')
     return '"' + value + '"'
-(desktop / 'io.github.machent.LumenCamera.desktop').write_text('[Desktop Entry]\nType=Application\nName=Lumen Camera\nComment=Webcam photos, videos and camera controls\nExec=' + desktop_quote(str(launcher)) + '\nIcon=io.github.machent.LumenCamera\nTerminal=false\nCategories=AudioVideo;Video;Photography;\nStartupNotify=true\nStartupWMClass=Lumen Camera\n')
+(desktop / 'io.github.machent.LumenCamera.desktop').write_text('[Desktop Entry]\nType=Application\nName=Lumen Camera\nComment=Webcam photos, videos and camera controls\nExec=' + desktop_quote(str(launcher)) + '\nIcon=io.github.machent.LumenCamera\nTerminal=false\nCategories=AudioVideo;Video;Photography;\nStartupNotify=true\nStartupWMClass=io.github.machent.LumenCamera\n')
 PY
 install -m 644 "$SOURCE/icon.svg" "$ICON_DIR/io.github.machent.LumenCamera.svg"
 if command -v update-desktop-database >/dev/null; then update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true; fi
