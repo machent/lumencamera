@@ -2,7 +2,7 @@ window { background: #11151e; color: #e8ecf5; }
 headerbar { background: #191f2c; border: none; box-shadow: none; padding: 8px; }
 headerbar .title { font-weight: bold; }
 .sidebar { background: #191f2c; border-radius: 14px; padding: 20px; }
-.title { font-size: 22px; font-weight: bold; }
+.title { font-size: 22px; font-weight: bold; color: #e8ecf5; }
 .section { font-size: 12px; font-weight: bold; color: #90a6c7; }
 .dim { color: #97a4b9; }
 .preview { background: #080b11; border-radius: 16px; }
