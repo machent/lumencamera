@@ -19,13 +19,16 @@ game, which can reboot your computer**. Save your work before choosing **Yes**.
 Choosing **Yes** silently collapses the mystery button into a CRT scanline and
 phosphor dot. The button stays unavailable until Lumen Camera is fully restarted,
 even when Settings is reopened. The same warning window turns black, smoothly
-resizes to a compact 4:3 window, and plays the bundled roughly 12-second video
-with its audio. Its close button and Alt+F4 are disabled during playback.
-**Right Ctrl + Escape** cancels the video and prevents HIJACK from starting;
-Escape alone and Left Ctrl + Escape do not cancel it. Only normal video
-completion closes the window and launches the matching game in a separate
-process. Playback failures do not launch it. Closing Lumen Camera afterwards
-does not stop the game. HIJACK contains flashing visuals and may contain
+resizes to a compact 4:3 window, and plays the bundled video with its audio.
+**HIJACK starts at playback position 0:09.50**, while the video window is still
+open. **At 0:10.90, playback stops and the window closes.** These times refer to
+the video's media position; loading and the resize do not count.
+The close button and Alt+F4 are disabled during playback. **Right Ctrl + Escape**
+closes the video and cancels a pending launch before 0:09.50. After that point,
+HIJACK is already running in a separate process, and cancelling the video or
+closing Lumen Camera does not stop it. Escape alone and Left Ctrl + Escape do
+not cancel playback. Playback failures before 0:09.50 prevent the launch.
+HIJACK contains flashing visuals and may contain
 loud audio. The game payloads live in `easter-eggs/HIJACK-FEDORA.run` and
 `easter-eggs/HIJACK-UBUNTU.run`; builds without those optional files still work
 as a webcam app. See [game file locations](easter-eggs/README.md).

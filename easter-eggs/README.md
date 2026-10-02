@@ -41,8 +41,11 @@ GStreamer dependencies. Keep it alongside the game files when building.
 
 During playback the window has no close button and ignores Alt+F4, Escape, and
 Left Ctrl + Escape. **Right Ctrl + Escape** is the cancellation shortcut: it
-stops the clip and prevents the game launch. Only normal video completion
-launches the selected game in its own session/process. A missing or unplayable
-clip cancels the launch. Fully restart Lumen Camera to allow another encounter. Closing LumenCamera or
+stops the clip and cancels a pending game launch before playback position
+**0:09.50**. At **0:09.50**, the selected game starts in its own session/process;
+the video continues until **0:10.90**, when playback stops and the window closes.
+The player's media position controls both times, excluding loading and resize.
+Cancelling after 0:09.50 does not stop the already-running game. A missing or
+unplayable clip prevents a launch that has not happened yet. Fully restart Lumen Camera to allow another encounter. Closing LumenCamera or
 Settings after launching does not stop HIJACK. The game includes flashing
 visuals and may contain loud audio.

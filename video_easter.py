@@ -1,17 +1,22 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Turn the accepted warning into a compact video, then finish on real EOS."""
+"""Play the accepted warning's video with actions tied to its media timeline."""
 import time
 from pathlib import Path
 from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Gst, GstVideo
 
 VIDEO_PATH = Path(__file__).resolve().parent / 'easter-eggs' / 'tape-zero.webm'
+HIJACK_START_NS = 9500 * Gst.MSECOND
+VIDEO_END_NS = 10900 * Gst.MSECOND
 
 
 class EasterEggVideo:
-    def __init__(self, dialog, complete, error, path=VIDEO_PATH, audio_sink=None):
+    def __init__(self, dialog, complete, error, path=VIDEO_PATH, audio_sink=None, launch=None):
         self.dialog = dialog
         self.complete = complete
         self.error = error
+        self.launch = launch
+        self.game_started = False
+        self.last_position = 0
         self.path = Path(path)
         self.audio_sink = audio_sink
         self.pipeline = None
@@ -124,7 +129,7 @@ class EasterEggVideo:
             error, _ = message.parse_error()
             self.finish(False, 'Video playback failed: ' + error.message)
         elif message.type == Gst.MessageType.EOS and self.phase == 'playing':
-            self.finish(True)
+            self.finish(False, 'The video ended before its scheduled stop.')
         elif message.type == Gst.MessageType.ASYNC_DONE and self.phase == 'loading':
             if self.frame is None:
                 self.finish(False, 'The file has no playable video.')
@@ -153,6 +158,18 @@ class EasterEggVideo:
                 self.phase = 'playing'
                 if self.pipeline.set_state(Gst.State.PLAYING) == Gst.StateChangeReturn.FAILURE:
                     self.finish(False, 'The video could not start playing.')
+                    return False
+        if self.phase == 'playing':
+            ready, position = self.pipeline.query_position(Gst.Format.TIME)
+            if ready and position >= 0:
+                self.last_position = position
+                # Loading and the resize do not count toward playback time.
+                if position >= HIJACK_START_NS and not self.game_started:
+                    self.game_started = True
+                    if self.launch is not None:
+                        self.launch()
+                if position >= VIDEO_END_NS:
+                    self.finish(True)
                     return False
         if self.phase == 'playing' and self.frame is not self.frame_seen and self.frame is not None:
             data, width, height, stride = self.frame

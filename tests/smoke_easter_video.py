@@ -1,4 +1,4 @@
-"""Actual bundled video, CRT frames, right-control cancellation and EOS ordering.
+"""Actual bundled video, CRT frames, right-control cancellation and playback-timeline actions.
 
 Never executes a HIJACK binary; every child launch is mocked.
 """
@@ -6,12 +6,11 @@ import os
 import sys
 import time
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import cairo
 from app import CameraApp, MysteryButton, Gtk, Gdk, GLib, Gst
-from video_easter import EasterEggVideo, VIDEO_PATH
+from video_easter import EasterEggVideo, VIDEO_PATH, HIJACK_START_NS, VIDEO_END_NS
 
 app = CameraApp(demo=True)
 failure = []
@@ -24,8 +23,8 @@ def test():
     with patch('app.launch_hijack') as launch:
         launch.return_value.poll.return_value = 0
         try:
-            # Play the provided full-length clip with a clocked silent audio
-            # sink. Verify normal EOS closes the video before the game launch.
+            # Use the real bundled clip with clocked audio; launch must occur
+            # at 9.50s with the window still open, and video must stop at 10.90s.
             dialog = Gtk.Dialog(title='Test video', transient_for=window, modal=True)
             dialog.set_default_size(642, 230)
             mystery = MysteryButton(lambda *_: None)
@@ -35,11 +34,20 @@ def test():
             def finish(completion):
                 assert not dialog.get_visible()
                 completed.append(completion)
-                window.finish_easter_video('fedora', completion)
+                window.finish_easter_video(completion)
                 loop.quit()
             audio = Gst.ElementFactory.make('fakesink')
             audio.set_property('sync', True)
-            video = EasterEggVideo(dialog, finish, failure.append, audio_sink=audio)
+            launched_at = []
+            def timed_launch():
+                try:
+                    assert dialog.get_visible() and video.phase == 'playing'
+                    assert HIJACK_START_NS <= video.last_position < HIJACK_START_NS + 250 * Gst.MSECOND
+                    launched_at.append(video.last_position)
+                    window.launch_easter_game('fedora')
+                except Exception as exc:
+                    failure.append(repr(exc))
+            video = EasterEggVideo(dialog, finish, failure.append, audio_sink=audio, launch=timed_launch)
             window.easter_video = video
             window.easter_used = True
             loop = GLib.MainLoop()
@@ -109,7 +117,11 @@ def test():
             loop.run()
             GLib.source_remove(timer)
             assert inspected and completed == [True]
-            assert time.monotonic() - start >= 11.8, 'Only the real video EOS may start HIJACK'
+            assert len(launched_at) == 1
+            assert VIDEO_END_NS <= video.last_position < VIDEO_END_NS + 250 * Gst.MSECOND
+            assert video.last_position - launched_at[0] >= Gst.SECOND, 'The video must keep running after HIJACK starts'
+            video.animate()
+            video.finish(True)
             assert video.frames_shown > 100 and video.tick is None and video.deadline is None
             assert video.pipeline.get_state(0)[1] == Gst.State.NULL
             launch.assert_called_once_with('fedora')
@@ -119,7 +131,7 @@ def test():
             dialog = Gtk.Dialog(transient_for=window, modal=True)
             dialog.show_all()
             done = []
-            video = EasterEggVideo(dialog, done.append, failure.append, audio_sink=audio)
+            video = EasterEggVideo(dialog, done.append, failure.append, audio_sink=audio, launch=lambda: window.launch_easter_game('fedora'))
             video.start()
             def press(value):
                 event = Gdk.Event.new(Gdk.EventType.KEY_PRESS)
@@ -140,20 +152,20 @@ def test():
             errors = []
             dialog = Gtk.Dialog(transient_for=window)
             dialog.show_all()
-            video = EasterEggVideo(dialog, done.append, errors.append, path=VIDEO_PATH.with_name('missing.webm'))
+            video = EasterEggVideo(dialog, done.append, errors.append, path=VIDEO_PATH.with_name('missing.webm'), launch=lambda: window.launch_easter_game('fedora'))
             video.start()
             assert done == [False] and errors
             launch.assert_not_called()
             # Closing Lumen Camera while a clip is active also cancels it.
             dialog = Gtk.Dialog(transient_for=window)
             dialog.show_all()
-            video = EasterEggVideo(dialog, lambda complete: window.finish_easter_video('fedora', complete), failure.append, audio_sink=audio)
+            video = EasterEggVideo(dialog, window.finish_easter_video, failure.append, audio_sink=audio, launch=lambda: window.launch_easter_game('fedora'))
             window.easter_video = video
             video.start()
             window.close_now()
             assert video.finished and video.pipeline.get_state(0)[1] == Gst.State.NULL
             launch.assert_not_called()
-            print('PASS: bundled 4:3 video, smooth resize, CRT shutdown, real EOS, close-key handling, Right Ctrl+Escape, error and close cleanup', flush=True)
+            print('PASS: bundled 4:3 video, smooth resize, CRT shutdown, launch at 9.50s/stop at 10.90s, close-key handling, Right Ctrl+Escape, error and close cleanup', flush=True)
         except Exception as exc:
             failure.append(repr(exc))
     window.close_now()

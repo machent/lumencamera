@@ -1190,12 +1190,15 @@ class CameraWindow(Gtk.ApplicationWindow):
         self.easter_used = True
         if mystery is not None:
             mystery.shutdown()
-        self.easter_video = EasterEggVideo(dialog, lambda completed: self.finish_easter_video(family, completed), self.status)
+        self.easter_video = EasterEggVideo(dialog, self.finish_easter_video, self.status,
+                                          launch=lambda: self.launch_easter_game(family))
         self.easter_video.start()
 
-    def finish_easter_video(self, family, completed):
+    def finish_easter_video(self, _completed):
         self.easter_video = None
-        if not completed or self.closed:
+
+    def launch_easter_game(self, family):
+        if self.closed:
             return
         try:
             process = launch_hijack(family)
