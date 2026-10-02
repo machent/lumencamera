@@ -53,3 +53,5 @@ window.easter-video drawingarea {
     min-height: 0;
     min-width: 0;
 }
+
+button.virtual-active { background: #275d54; border-color: #58cbb3; color: #f0fff9; }

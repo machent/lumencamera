@@ -14,11 +14,14 @@ Requires:       gstreamer1
 Requires:       gstreamer1-plugins-base
 Requires:       gstreamer1-plugins-good
 Requires:       v4l-utils
+Requires:       akmod-v4l2loopback
+Requires:       polkit
 
 %description
 Lumen Camera is a GTK desktop webcam application with camera and capture mode
 selection, PNG/JPEG photos, Matroska recording with selectable microphone audio,
-hardware camera controls and customizable output filenames and folders.
+virtual camera output, hardware camera controls and customizable output filenames
+and folders.
 
 %prep
 %autosetup -n lumencamera-%{version}
@@ -28,7 +31,7 @@ hardware camera controls and customizable output filenames and folders.
 
 %install
 install -d %{buildroot}%{_datadir}/lumencamera
-for file in app.py core.py easter_egg.py video_easter.py style.css; do
+for file in app.py core.py easter_egg.py video_easter.py virtual_camera.py style.css; do
     install -m 0644 "$file" %{buildroot}%{_datadir}/lumencamera/
 done
 cp -R easter-eggs %{buildroot}%{_datadir}/lumencamera/

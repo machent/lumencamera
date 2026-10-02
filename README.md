@@ -1,5 +1,9 @@
 # Lumen Camera
 
+The current `main` branch includes an **unreleased virtual camera**. Start/stop
+sharing the preview with Discord or another camera app using the third capture
+button. The published v1.0 release and APT/DNF packages are unchanged.
+
 A modern webcam app for Fedora and Ubuntu with camera selection, photo capture, video recording, adjustable camera controls, and customizable filenames and save folders.
 
 **Version 1.0** includes the corrected, compact titlebar buttons.
@@ -41,6 +45,7 @@ unchanged.
 - Choose a webcam and its advertised resolution, frame rate and capture format.
 - Take PNG or JPEG photos at the capture resolution.
 - Record VP8 Matroska (`.mkv`) video. Clicking **Record video** opens a dialog with **Record with microphone**; enable it to choose an audio input before starting. The app remembers your last choice.
+- Start/stop a virtual camera next to Record video to share the live preview with Discord or another camera app, while continuing to adjust camera controls or record.
 - Adjust supported camera controls in the main sidebar, including focus, autofocus, sharpness, exposure, brightness and white balance.
 - Restore the selected webcam's adjustable controls with **Camera Defaults**, after confirmation. Driver defaults are used; unavailable or read-only controls are skipped. Save settings and captures stay unchanged.
 - Configure the save folder, filename pattern, photo format and preview/photo mirroring.
@@ -48,6 +53,70 @@ unchanged.
 - Open the output folder and see recording time in the main window.
 
 Camera controls depend on the device. Unsupported controls are omitted; unavailable or read-only controls are disabled. Manual focus and exposure may require switching their automatic modes off.
+
+## Virtual camera
+
+This feature requires **v4l2loopback**, the kernel-module dependency used by
+[OBS's Linux virtual camera](https://github.com/obsproject/obs-studio/blob/master/plugins/linux-v4l2/v4l2-output.c).
+OBS itself is not required. The `.run` installer uses an existing v4l2loopback
+module built for the running kernel. For source and `.run` installations, install
+`v4l2loopback-dkms` on Ubuntu, or `akmod-v4l2loopback` from
+[RPM Fusion Free](https://rpmfusion.org/Configuration) on Fedora. PolicyKit's
+`pkexec` command is needed to load an installed module from the app.
+
+Native package builds from this branch declare `v4l2loopback-dkms` and `pkexec`
+as Debian/Ubuntu dependencies, and `akmod-v4l2loopback` and `polkit` as Fedora
+dependencies. APT/DNF will install those dependencies when the next package
+version is available; Fedora needs RPM Fusion Free enabled. Installing a kernel
+module package does not replace the requirement for a module built and loadable
+for the running kernel. The published v1.0 packages do not contain this feature.
+
+1. Start the webcam preview, then click **Start virtual camera**.
+2. If the installed module is not loaded, an administrator prompt loads it with
+   `exclusive_caps=1` and the name **LumenCamera Virtual Camera**. If it is already
+   loaded, the app reuses an available loopback device. Several available devices
+   open a selector; busy or physical camera devices are never offered.
+3. Select the name displayed below the buttons in Discord or your other app.
+   An existing device can retain a name such as **OBS Virtual Camera**.
+4. Click **Stop virtual camera** to stop sharing. Closing Lumen Camera also stops
+   the output; it does not unload your kernel module.
+
+The output follows preview mirroring and the selected webcam's hardware settings.
+It contains video only. Microphone choices in Record video apply to saved MKV
+files; select a microphone separately in Discord.
+
+The output is YUY2 at 30 fps, using the preview resolution when sharing starts
+(odd widths are rounded up by one pixel). Changing cameras or capture modes keeps
+that output format stable and scales/letterboxes new frames. Stop/start sharing
+to adopt another output resolution. Short capture restarts send black frames so
+the output stays connected. Recording may run at the same time.
+
+For browser/WebRTC clients, the loopback module should be configured with
+`exclusive_caps=1`; see the [v4l2loopback documentation](https://github.com/v4l2loopback/v4l2loopback).
+If no writable device is found, stop another producer such as OBS, check access
+to the video device, and try again. The app does not unload an existing module or
+interrupt another producer. Device permissions and kernel-module setup remain
+your system's configuration.
+
+The implementation follows OBS's module-loading/device-selection approach with
+independently written Python code and GStreamer's
+[v4l2sink](https://gstreamer.freedesktop.org/documentation/video4linux2/v4l2sink.html)
+in memory-mapped (`mmap`) mode. GStreamer's read/write output path does not
+implement frame writing and must not be used for this sink. Conversion buffers
+are allocated separately from the device's mmap pool, so conversion and frame
+rate adjustment cannot consume the limited buffers supplied by the loopback.
+Tests exercise the production sink configuration, allocation-query isolation,
+real frame conversion and GTK behavior with an appsink substitute. The corrected
+output has also been confirmed working on the maintainer's Fedora setup with an
+existing OBS loopback device that provides two buffers.
+
+Virtual-camera startup, device selection, output state and failures are logged
+to the terminal. To capture detailed GStreamer output, close the app and run:
+
+```bash
+env GST_DEBUG_NO_COLOR=1 GST_DEBUG='2,v4l2*:5,appsrc:4' \
+  "$HOME/.local/bin/lumen-camera" 2>&1 | tee "$HOME/lumen-virtual-camera.log"
+```
 
 ## Install from the package repository
 
@@ -111,6 +180,12 @@ The window identity matches the installed desktop entry for the Lumen Camera ico
 python3 build_run.py
 ```
 
+To choose custom installer and source-archive filenames:
+
+```bash
+python3 build_run.py --output-prefix Lumen-Camera-test
+```
+
 The `.run` installs for the current user under `~/.local/share/lumen-camera` and uses `~/.local/bin/lumen-camera`. Run it without sudo.
 
 ## Settings and captures
@@ -126,6 +201,7 @@ Mirroring affects the preview and saved photos. Videos retain the camera's origi
 ```bash
 /usr/bin/python3 -m unittest discover -s tests -v
 xvfb-run -a /usr/bin/python3 tests/smoke.py
+xvfb-run -a /usr/bin/python3 tests/smoke_virtual_camera.py
 ```
 
 The smoke test uses a synthetic camera to exercise preview, PNG/JPEG photos, filename collision handling, camera-control widgets, the recording dialog, microphone selection, Matroska encoding/decoding with and without audio, and closing during recording. It requires the application dependencies plus Xvfb.

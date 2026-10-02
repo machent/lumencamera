@@ -42,7 +42,7 @@ gi.require_version('Gst','1.0')
 gi.require_version('GstVideo','1.0')
 from gi.repository import Gtk,Gst,GstVideo
 Gst.init(None)
-for element in ['v4l2src','videoconvert','appsink','jpegdec','vp8enc','matroskamux','pulsesrc','vorbisenc']:
+for element in ['v4l2src','v4l2sink','videoflip','videoscale','videorate','appsrc','videoconvert','appsink','jpegdec','vp8enc','matroskamux','pulsesrc','vorbisenc']:
     assert Gst.ElementFactory.find(element), element
 PY
 command -v v4l2-ctl >/dev/null || need_deps=1
@@ -93,7 +93,7 @@ if [[ "$need_deps" == 1 ]]; then
 fi
 mkdir -p "$APP_DIR" "$BIN_DIR" "$DESKTOP_DIR" "$ICON_DIR"
 # Source and package paths are separate, ready for future system packages.
-for file in app.py core.py easter_egg.py video_easter.py style.css icon.svg README.md LICENSE launcher.sh; do
+for file in app.py core.py easter_egg.py video_easter.py virtual_camera.py style.css icon.svg README.md LICENSE launcher.sh; do
     install -m 644 "$SOURCE/$file" "$APP_DIR/$file"
 done
 chmod 755 "$APP_DIR/launcher.sh"

@@ -2,13 +2,19 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Build an architecture-independent, checksummed self-extracting .run."""
 import hashlib
+import argparse
 from core import VERSION
 import io
 import tarfile
 from pathlib import Path
 
 root = Path(__file__).resolve().parent
-output = root.parent / f'Lumen-Camera-{VERSION}.run'
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--output-prefix', default=f'Lumen-Camera-{VERSION}', help='Filename prefix for the installer and source archive')
+prefix = parser.parse_args().output_prefix
+if Path(prefix).name != prefix or prefix in ('', '.', '..'):
+    parser.error('--output-prefix must be a filename, without a directory')
+output = root.parent / (prefix + '.run')
 buffer = io.BytesIO()
 with tarfile.open(fileobj=buffer, mode='w:gz') as archive:
     for path in sorted(root.rglob('*')):
@@ -49,7 +55,7 @@ __LUMEN_PAYLOAD__
 '''.replace('DIGEST', digest).replace('__VERSION__', VERSION)
 output.write_bytes(header.encode() + payload)
 output.chmod(0o755)
-source = root.parent / f'Lumen-Camera-{VERSION}-source.tar.gz'
+source = root.parent / (prefix + '-source.tar.gz')
 with tarfile.open(source, 'w:gz') as archive:
     for path in sorted(root.rglob('*')):
         if path.is_file() and not any(part in ('__pycache__', 'dist', '.git') for part in path.relative_to(root).parts) and path.suffix != '.pyc':

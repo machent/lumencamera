@@ -4,13 +4,17 @@
 import argparse
 import concurrent.futures
 import glob
+import logging
 import math
 import os
 import random
 import subprocess
 import sys
 import time
+import threading
 from pathlib import Path
+
+logging.basicConfig(level=logging.INFO, format='[%(name)s] %(message)s')
 
 from core import Settings, VERSION, APP_ID, reserve_output, parse_controls, parse_modes, mode_id, mode_label, capture_source, restore_camera_defaults, configure_display_backend
 configure_display_backend()
@@ -30,6 +34,7 @@ gi.require_version('PangoCairo', '1.0')
 from gi.repository import Gtk, Gdk, GdkPixbuf, Gio, GLib, Gst, GstVideo, Pango, PangoCairo
 from easter_egg import settings_encounter, launch_hijack
 from video_easter import EasterEggVideo
+from virtual_camera import VirtualCameraOutput, discover_virtual_devices
 
 Gdk.set_program_class(APP_ID)
 Gst.init(None)
@@ -52,6 +57,8 @@ def camera_inventory():
     for device in sorted(glob.glob('/dev/video[0-9]*'), key=lambda s: int(s[10:])):
         try:
             info = v4l(device, '--info')
+            if 'v4l2loopback' in info.casefold().replace(' ', '').replace('-', ''):
+                continue  # Never capture our own output (or another loopback).
             caps = info.split('Device Caps', 1)[-1]
             if 'Video Capture' not in caps:
                 continue
@@ -463,6 +470,9 @@ class CameraWindow(Gtk.ApplicationWindow):
         self.defaults_busy = False
         self.easter_used = False
         self.easter_video = None
+        self.virtual_output = None
+        self.virtual_busy = False
+        self.virtual_cancel = threading.Event()
 
         self.connect('delete-event', self.on_close)
         header = Gtk.HeaderBar(title='Lumen Camera', subtitle='Photo & video studio', show_close_button=False)
@@ -492,9 +502,15 @@ class CameraWindow(Gtk.ApplicationWindow):
         actions.set_halign(Gtk.Align.CENTER)
         self.photo_button = button('Take photo', self.take_photo, 'primary')
         self.record_button = button('Record video', self.toggle_record, 'primary')
+        self.virtual_button = button('Start virtual camera', self.toggle_virtual_camera, 'primary')
         actions.pack_start(self.photo_button, False, False, 0)
         actions.pack_start(self.record_button, False, False, 0)
+        actions.pack_start(self.virtual_button, False, False, 0)
         left.pack_start(actions, False, False, 0)
+        self.virtual_label = label('', 'dim')
+        self.virtual_label.set_halign(Gtk.Align.CENTER)
+        self.virtual_label.set_no_show_all(True)
+        left.pack_start(self.virtual_label, False, False, 0)
         self.time_label = label('Ready when you are', 'dim')
         self.time_label.set_halign(Gtk.Align.CENTER)
         left.pack_start(self.time_label, False, False, 0)
@@ -532,6 +548,7 @@ class CameraWindow(Gtk.ApplicationWindow):
         self.show_all()
         self.photo_button.set_sensitive(False)
         self.record_button.set_sensitive(False)
+        self.virtual_button.set_sensitive(False)
         self.preview_tick = GLib.timeout_add(33, self.update_preview)
         self.clock_tick = GLib.timeout_add(250, self.update_clock)
         self.refresh_cameras()
@@ -554,6 +571,7 @@ class CameraWindow(Gtk.ApplicationWindow):
         self.status_label.set_tooltip_text(message)
 
     def error(self, message):
+        logging.getLogger('lumencamera').error(message)
         self.status(message)
         dialog = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.ERROR,
                                    buttons=Gtk.ButtonsType.CLOSE, text='Lumen Camera')
@@ -822,6 +840,7 @@ class CameraWindow(Gtk.ApplicationWindow):
         self.frame = self.pixbuf = self.frame_seen = None
         self.photo_button.set_sensitive(False)
         self.record_button.set_sensitive(False)
+        self.virtual_button.set_sensitive(self.virtual_output is not None and not self.virtual_busy)
         self.preview.queue_draw()
 
     def on_sample(self, sink):
@@ -854,7 +873,88 @@ class CameraWindow(Gtk.ApplicationWindow):
             self.record_button.set_sensitive(not self.finalizing)
             if first:
                 self.status(('Recording to ' + str(self.record_path)) if self.recording else f'Live · {width} × {height}')
+        if self.virtual_output is not None:
+            # Share the same image and mirror setting as the displayed preview.
+            # A blank frame keeps the consumer open during camera restarts.
+            self.virtual_output.push(frame, self.settings.values['mirror'])
+        self.virtual_button.set_sensitive(not self.virtual_busy and (self.virtual_output is not None or self.pixbuf is not None))
         return True
+
+    def toggle_virtual_camera(self, *_):
+        if self.virtual_busy:
+            return
+        if self.virtual_output is not None:
+            self.stop_virtual_camera()
+            self.status('Virtual camera stopped.')
+            return
+        if self.frame is None:
+            return
+        self.virtual_busy = True
+        self.virtual_cancel.clear()
+        self.virtual_button.set_label('Starting virtual camera…')
+        self.virtual_button.set_sensitive(False)
+        self.status('Finding a virtual camera…')
+        def complete(devices, error):
+            self.virtual_busy = False
+            self.virtual_button.set_label('Start virtual camera')
+            if error:
+                self.error(error)
+                return
+            selected = devices[0]
+            if len(devices) > 1:
+                dialog = Gtk.Dialog(title='Virtual camera output', transient_for=self, modal=True)
+                dialog.add_buttons('Cancel', Gtk.ResponseType.CANCEL, 'Start', Gtk.ResponseType.OK)
+                box = dialog.get_content_area()
+                box.set_margin_top(20)
+                box.set_margin_bottom(20)
+                box.set_margin_start(20)
+                box.set_margin_end(20)
+                choices = Gtk.ComboBoxText()
+                for item in devices:
+                    choices.append(item['path'], item['name'] + ' (' + item['path'] + ')')
+                choices.set_active(0)
+                box.pack_start(label('Choose the virtual camera to use in Discord or another app.', 'dim'), False, False, 8)
+                box.pack_start(choices, False, False, 0)
+                dialog.show_all()
+                response = dialog.run()
+                path = choices.get_active_id()
+                dialog.destroy()
+                if response != Gtk.ResponseType.OK or self.closed:
+                    return
+                selected = next(item for item in devices if item['path'] == path)
+            if self.frame is None:
+                self.status('The camera preview is not available. Start a camera, then try again.')
+                return
+            output = VirtualCameraOutput(lambda message: self.virtual_output_failed(output, message))
+            try:
+                _, width, height, _ = self.frame
+                output.start(selected['path'], width, height, self.settings.values['mirror'])
+                self.virtual_output = output
+                self.virtual_button.set_label('Stop virtual camera')
+                self.virtual_button.set_sensitive(True)
+                self.virtual_button.get_style_context().add_class('virtual-active')
+                self.virtual_label.set_text('Virtual camera active · ' + selected['name'])
+                self.virtual_label.show()
+                self.status('Choose “' + selected['name'] + '” in Discord or your other camera app.')
+            except Exception as exc:
+                output.stop()
+                self.error('Could not start virtual camera: ' + str(exc))
+        self.background(lambda: discover_virtual_devices(self.virtual_cancel), complete)
+
+    def virtual_output_failed(self, output, message):
+        if self.virtual_output is output:
+            self.stop_virtual_camera()
+            if not self.closed:
+                self.status(message)
+
+    def stop_virtual_camera(self):
+        if self.virtual_output is not None:
+            self.virtual_output.stop()
+            self.virtual_output = None
+        self.virtual_button.set_label('Start virtual camera')
+        self.virtual_button.get_style_context().remove_class('virtual-active')
+        self.virtual_button.set_sensitive(self.pixbuf is not None and not self.virtual_busy)
+        self.virtual_label.hide()
 
     def draw_preview(self, widget, cr):
         width, height = widget.get_allocated_width(), widget.get_allocated_height()
@@ -1224,6 +1324,8 @@ class CameraWindow(Gtk.ApplicationWindow):
         if self.closed:
             return
         self.closed = True
+        self.virtual_cancel.set()
+        self.stop_virtual_camera()
         if self.easter_video is not None:
             self.easter_video.finish(False)
         self.stop_pipeline()

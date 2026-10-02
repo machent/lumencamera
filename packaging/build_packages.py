@@ -49,7 +49,7 @@ def deb(out):
     ver = version()
     with tempfile.TemporaryDirectory(prefix='lumencamera-deb-') as tmp:
         stage = Path(tmp) / 'stage'
-        for name in ('app.py', 'core.py', 'easter_egg.py', 'video_easter.py', 'style.css'):
+        for name in ('app.py', 'core.py', 'easter_egg.py', 'video_easter.py', 'virtual_camera.py', 'style.css'):
             put(ROOT / name, stage / 'usr/share/lumencamera' / name)
         for file in (ROOT / 'easter-eggs').rglob('*'):
             if file.is_file():
@@ -78,11 +78,12 @@ Priority: optional
 Architecture: all
 Maintainer: {maintainer}
 Installed-Size: {size}
-Depends: python3 (>= 3.9), python3-gi, python3-gi-cairo, gir1.2-gtk-3.0, gir1.2-gstreamer-1.0, gir1.2-gst-plugins-base-1.0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, v4l-utils
+Depends: python3 (>= 3.9), python3-gi, python3-gi-cairo, gir1.2-gtk-3.0, gir1.2-gstreamer-1.0, gir1.2-gst-plugins-base-1.0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, v4l-utils, v4l2loopback-dkms, pkexec
 Homepage: https://github.com/machent/lumencamera
 Description: Webcam photos, videos and hardware camera controls
  Native GTK webcam application with camera selection, PNG/JPEG photos,
- Matroska recording with selectable microphone audio, hardware camera controls
+ Matroska recording with selectable microphone audio, virtual camera output,
+ hardware camera controls
  and customizable output filenames and folders.
 ''')
         (meta / 'control').chmod(0o644)
