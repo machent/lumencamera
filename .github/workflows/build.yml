@@ -71,11 +71,11 @@ jobs:
           docker run --rm -v "$PWD:/source" -w /source fedora:latest bash -euc '
             dnf install -y rpm-build python3 tar gzip cpio
             python3 packaging/build_packages.py rpm
-            rpm -qp --info dist/*.noarch.rpm
-            rpm -qp --requires dist/*.noarch.rpm
-            test "$(rpm -qp --queryformat '%{VERSION}' dist/*.noarch.rpm)" = "$(python3 -c "from core import VERSION; print(VERSION)")"
+            rpm -qp --info dist/*.x86_64.rpm
+            rpm -qp --requires dist/*.x86_64.rpm
+            test "$(rpm -qp --queryformat '%{VERSION}' dist/*.x86_64.rpm)" = "$(python3 -c "from core import VERSION; print(VERSION)")"
             mkdir -p /tmp/lumen-rpm-extracted
-            rpm2cpio dist/*.noarch.rpm | (cd /tmp/lumen-rpm-extracted && cpio -idm --quiet)
+            rpm2cpio dist/*.x86_64.rpm | (cd /tmp/lumen-rpm-extracted && cpio -idm --quiet)
             python3 tests/verify_bundle.py /tmp/lumen-rpm-extracted
           '
       - uses: actions/upload-artifact@v4
@@ -114,12 +114,12 @@ jobs:
           mkdir packages
           shopt -s nullglob
           deb=(artifacts/debian/*.deb)
-          rpm=(artifacts/fedora/*.noarch.rpm)
+          rpm=(artifacts/fedora/*.x86_64.rpm)
           test "${#deb[@]}" -eq 1
           test "${#rpm[@]}" -eq 1
           test "$(dpkg-deb -f "${deb[0]}" Package)" = lumencamera
           test "$(dpkg-deb -f "${deb[0]}" Version)" = 1.1-1
-          test "$(dpkg-deb -f "${deb[0]}" Architecture)" = all
+          test "$(dpkg-deb -f "${deb[0]}" Architecture)" = amd64
           cp "${deb[0]}" "${rpm[0]}" packages/
           (cd packages && sha256sum *.deb *.rpm > SHA256SUMS)
       - name: Prepare release notes
@@ -137,14 +137,16 @@ jobs:
 
           **HIJACK warning:** The easter egg launches an interactive game that can reboot your computer, contains flashing visuals and may play loud audio. Save your work before choosing Yes in its confirmation window. HIJACK starts at video position 0:09.50; the video closes at 0:10.90. Right Ctrl + Escape cancels the video and a pending launch before 0:09.50. Once launched, HIJACK runs separately and closing LumenCamera does not stop it.
 
+          The complete packages target x86-64 (amd64), matching the bundled HIJACK executables.
+
           **Ubuntu / Debian:** download the .deb and run:
           ```bash
-          sudo apt install ./lumencamera_1.1-1_all.deb
+          sudo apt install ./lumencamera_1.1-1_amd64.deb
           ```
 
-          **Fedora:** enable RPM Fusion Free (https://rpmfusion.org/Configuration), download the .noarch.rpm and run:
+          **Fedora:** enable RPM Fusion Free (https://rpmfusion.org/Configuration), download the .x86_64.rpm and run:
           ```bash
-          sudo dnf install ./lumencamera-1.1-1*.noarch.rpm
+          sudo dnf install ./lumencamera-1.1-1*.x86_64.rpm
           ```
 
           Launch Lumen Camera from the application menu or run lumencamera.

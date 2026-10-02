@@ -1,3 +1,9 @@
+# Keep the bundled self-extracting games byte-for-byte intact.
+%global debug_package %{nil}
+%global __brp_strip %{nil}
+%global __brp_strip_comment_note %{nil}
+%global __brp_strip_lto %{nil}
+
 Name:           lumencamera
 Version:        1.1
 Release:        1%{?dist}
@@ -5,7 +11,7 @@ Summary:        Webcam photos, videos and hardware camera controls
 License:        GPL-3.0-only
 URL:            https://github.com/machent/lumencamera
 Source0:        %{url}/archive/refs/tags/v%{version}.tar.gz#/lumencamera-%{version}.tar.gz
-BuildArch:      noarch
+BuildArch:      x86_64
 Requires:       python3 >= 3.9
 Requires:       python3-gobject
 Requires:       python3-cairo

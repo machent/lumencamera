@@ -75,7 +75,7 @@ def deb(out):
 Version: {ver}-1
 Section: video
 Priority: optional
-Architecture: all
+Architecture: amd64
 Maintainer: {maintainer}
 Installed-Size: {size}
 Depends: python3 (>= 3.9), python3-gi, python3-gi-cairo, gir1.2-gtk-3.0, gir1.2-gstreamer-1.0, gir1.2-gst-plugins-base-1.0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, v4l-utils, v4l2loopback-dkms, pkexec
@@ -87,7 +87,7 @@ Description: Webcam photos, videos and hardware camera controls
  and customizable output filenames and folders.
 ''')
         (meta / 'control').chmod(0o644)
-        target = out / f'lumencamera_{ver}-1_all.deb'
+        target = out / f'lumencamera_{ver}-1_amd64.deb'
         subprocess.run(['dpkg-deb', '--build', '--root-owner-group', str(stage), str(target)], check=True)
         return [target]
 

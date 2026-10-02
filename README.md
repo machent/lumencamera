@@ -130,18 +130,21 @@ Future versions arrive through your usual system updates.
 
 ## Install version 1.1 from a package file
 
+The complete v1.1 packages target **x86-64 (amd64)** because the bundled HIJACK
+games contain x86-64 executables.
+
 Download the package for your distribution from [GitHub Releases](https://github.com/machent/lumencamera/releases/tag/v1.1).
 
 Ubuntu / Debian, from the download folder:
 
 ```bash
-sudo apt install ./lumencamera_1.1-1_all.deb
+sudo apt install ./lumencamera_1.1-1_amd64.deb
 ```
 
 Fedora, from the download folder:
 
 ```bash
-sudo dnf install ./lumencamera-1.1-1*.noarch.rpm
+sudo dnf install ./lumencamera-1.1-1*.x86_64.rpm
 ```
 
 Open Lumen Camera from the application menu or run `lumencamera`. The release includes SHA-256 checksums. Signed APT and DNF repositories are also available as described above.
