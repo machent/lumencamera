@@ -1,11 +1,10 @@
 name: Build signed APT and DNF repositories
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Build and validate"]
+    types: [completed]
     branches: [main]
-    paths:
-      - .github/workflows/repositories.yml
-      - packaging/repositories/**
   release:
     types: [published]
   workflow_dispatch:
@@ -19,12 +18,14 @@ concurrency:
 
 jobs:
   build:
-    if: github.repository == 'machent/lumencamera' && (github.event_name == 'release' || github.ref == 'refs/heads/main')
+    if: github.repository == 'machent/lumencamera' && ((github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') || github.event_name == 'release' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     outputs:
       configured: ${{ steps.signing.outputs.configured }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Install repository tools
         run: sudo apt-get update && sudo apt-get install -y apt-utils gnupg
       - name: Download stable release packages and verify checksums
@@ -49,8 +50,8 @@ jobs:
           done < tags.txt
           test -n "$(find packages -name '*.deb' -print -quit)"
           test -n "$(find packages -name '*.rpm' -print -quit)"
-          test -f packages/lumencamera_1.1-1_amd64.deb
-          test -n "$(find packages -name 'lumencamera-1.1-1*.x86_64.rpm' -print -quit)"
+          test -f packages/lumencamera_1.2-1_amd64.deb
+          test -n "$(find packages -name 'lumencamera-1.2-1*.x86_64.rpm' -print -quit)"
       - name: Load signing key or create a disposable validation key
         id: signing
         env:
@@ -79,11 +80,11 @@ jobs:
             printf "deb [signed-by=/etc/apt/keyrings/lumencamera.asc] file:/repository/apt stable main\n" > /etc/apt/sources.list.d/lumencamera.list
             apt-get update
             apt-cache policy lumencamera
-            apt-get install -y lumencamera=1.0-1
+            apt-get install -y lumencamera=1.1-1
             apt-get install -y lumencamera
             test "$(dpkg-query -W -f="\${Status}" lumencamera)" = "install ok installed"
-            test "$(dpkg-query -W -f="\${Version}" lumencamera)" = 1.1-1
-            dpkg-query -W v4l2loopback-dkms pkexec
+            test "$(dpkg-query -W -f="\${Version}" lumencamera)" = 1.2-1
+            dpkg-query -W v4l2loopback-dkms v4l2loopback-utils pkexec
             /usr/bin/python3 /source/tests/verify_bundle.py /
             /usr/bin/python3 -c "import gi; gi.require_version(\"Gtk\", \"3.0\"); gi.require_version(\"Gst\", \"1.0\"); from gi.repository import Gtk, Gst"
           '
@@ -95,11 +96,11 @@ jobs:
             dnf install -y https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-44.noarch.rpm
             bash packaging/repositories/build.sh rpm packages site /signing/private-key.asc
             sed -e "s|https://machent.github.io/lumencamera/rpm|file:///source/site/rpm|" -e "s|https://machent.github.io/lumencamera/lumencamera-signing-key.asc|file:///source/site/lumencamera-signing-key.asc|" site/lumencamera.repo > /etc/yum.repos.d/lumencamera.repo
-            dnf install -y lumencamera-1.0-1.fc44.noarch
+            dnf install -y lumencamera-1.1-1.fc44.x86_64
             dnf upgrade -y lumencamera
             rpm -q lumencamera
-            test "$(rpm -q --qf "%{VERSION}" lumencamera)" = 1.1
-            rpm -q akmod-v4l2loopback polkit
+            test "$(rpm -q --qf "%{VERSION}" lumencamera)" = 1.2
+            rpm -q akmod-v4l2loopback v4l2loopback polkit
             /usr/bin/python3 /source/tests/verify_bundle.py /
             /usr/bin/python3 -c "import gi; gi.require_version(\"Gtk\", \"3.0\"); gi.require_version(\"Gst\", \"1.0\"); from gi.repository import Gtk, Gst"
           '
@@ -141,6 +142,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Check published files
         shell: bash
         run: |
@@ -160,8 +163,8 @@ jobs:
             apt-get update
             apt-get install -y lumencamera
             dpkg-query -W lumencamera
-            test "$(dpkg-query -W -f="\${Version}" lumencamera)" = 1.1-1
-            dpkg-query -W v4l2loopback-dkms pkexec
+            test "$(dpkg-query -W -f="\${Version}" lumencamera)" = 1.2-1
+            dpkg-query -W v4l2loopback-dkms v4l2loopback-utils pkexec
             /usr/bin/python3 /source/tests/verify_bundle.py /
           '
       - name: Install through the public DNF repository
@@ -171,7 +174,7 @@ jobs:
             curl -fsSL https://machent.github.io/lumencamera/lumencamera.repo -o /etc/yum.repos.d/lumencamera.repo
             dnf install -y --refresh lumencamera
             rpm -q lumencamera
-            test "$(rpm -q --qf "%{VERSION}" lumencamera)" = 1.1
-            rpm -q akmod-v4l2loopback polkit
+            test "$(rpm -q --qf "%{VERSION}" lumencamera)" = 1.2
+            rpm -q akmod-v4l2loopback v4l2loopback polkit
             /usr/bin/python3 /source/tests/verify_bundle.py /
           '

@@ -86,13 +86,13 @@ jobs:
 
   release:
     needs: [ubuntu, fedora]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.head_commit.message == 'Release v1.1'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.head_commit.message == 'Release v1.2'
     runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: write
     concurrency:
-      group: release-1.1
+      group: release-1.2
       cancel-in-progress: false
     env:
       GH_TOKEN: ${{ github.token }}
@@ -118,7 +118,7 @@ jobs:
           test "${#deb[@]}" -eq 1
           test "${#rpm[@]}" -eq 1
           test "$(dpkg-deb -f "${deb[0]}" Package)" = lumencamera
-          test "$(dpkg-deb -f "${deb[0]}" Version)" = 1.1-1
+          test "$(dpkg-deb -f "${deb[0]}" Version)" = 1.2-1
           test "$(dpkg-deb -f "${deb[0]}" Architecture)" = amd64
           cp "${deb[0]}" "${rpm[0]}" packages/
           (cd packages && sha256sum *.deb *.rpm > SHA256SUMS)
@@ -126,9 +126,10 @@ jobs:
         shell: bash
         run: |
           cat > release-notes.md <<'NOTES'
-          LumenCamera v1.1 for Fedora and Ubuntu, with all current features and bundled easter-egg assets.
+          LumenCamera v1.2 for Fedora and Ubuntu, with all current features and bundled easter-egg assets.
 
           - Start/stop a virtual camera beside Record video to share the live preview in Discord and other camera apps, while adjusting camera controls or recording.
+          - Camera apps see the virtual camera as LumenCamera. When an OBS device already exists, create a separate named device without changing OBS. Initial setup can request administrator authorization. Creating a separate device requires v4l2loopback and its utility version 0.13 or newer; on older Ubuntu packages, start LumenCamera after a reboot before OBS loads the module.
           - Reliable YUY2 virtual-camera output at 30 fps, preview mirroring, stable output during camera changes, and terminal diagnostics.
           - Record Matroska (.mkv) video with an optional, selectable microphone.
           - Camera Defaults with confirmation, configurable filenames/folders, PNG/JPEG photos, and supported focus, autofocus, sharpness, exposure and other controls.
@@ -141,47 +142,47 @@ jobs:
 
           **Ubuntu / Debian:** download the .deb and run:
           ```bash
-          sudo apt install ./lumencamera_1.1-1_amd64.deb
+          sudo apt install ./lumencamera_1.2-1_amd64.deb
           ```
 
           **Fedora:** enable RPM Fusion Free (https://rpmfusion.org/Configuration), download the .x86_64.rpm and run:
           ```bash
-          sudo dnf install ./lumencamera-1.1-1*.x86_64.rpm
+          sudo dnf install ./lumencamera-1.2-1*.x86_64.rpm
           ```
 
           Launch Lumen Camera from the application menu or run lumencamera.
 
-          The native packages declare the virtual-camera dependencies: v4l2loopback-dkms and pkexec on Ubuntu; akmod-v4l2loopback and polkit on Fedora. The kernel module must be built and loadable for your running kernel. OBS is not required.
+          The native packages declare the virtual-camera dependencies: v4l2loopback-dkms, v4l2loopback-utils and pkexec on Ubuntu; akmod-v4l2loopback, v4l2loopback and polkit on Fedora. The kernel module must be built and loadable for your running kernel. OBS is not required.
 
           SHA256SUMS covers both packages. Full runtime and bundled-asset hashes/executable permissions are checked after package extraction; webcam/UI/recording/virtual-camera tests and Fedora/Ubuntu package builds pass before publication. Hardware camera controls depend on your device.
 
-          This release publishes package files; hosted APT/DNF repositories will be updated separately.
+          Signed APT/DNF repositories are updated after successful publication.
           NOTES
       - name: Verify or create the release tag
         shell: bash
         run: |
           set -euo pipefail
-          if gh release view v1.1 --json isDraft > existing.json 2>/dev/null; then
+          if gh release view v1.2 --json isDraft > existing.json 2>/dev/null; then
             jq -e '.isDraft == true' existing.json
           fi
-          if gh api "repos/$GH_REPO/git/ref/tags/v1.1" > tag.json 2>/dev/null; then
+          if gh api "repos/$GH_REPO/git/ref/tags/v1.2" > tag.json 2>/dev/null; then
             jq -e --arg sha "$RELEASE_COMMIT" '.object.sha == $sha' tag.json
           else
-            gh api --method POST "repos/$GH_REPO/git/refs" -f ref=refs/tags/v1.1 -f sha="$RELEASE_COMMIT"
+            gh api --method POST "repos/$GH_REPO/git/refs" -f ref=refs/tags/v1.2 -f sha="$RELEASE_COMMIT"
           fi
-      - name: Publish v1.1
+      - name: Publish v1.2
         shell: bash
         run: |
           set -euo pipefail
-          if gh release view v1.1 --json isDraft > existing.json 2>/dev/null; then
+          if gh release view v1.2 --json isDraft > existing.json 2>/dev/null; then
             jq -e '.isDraft == true' existing.json
-            test "$(gh api "repos/$GH_REPO/git/ref/tags/v1.1" --jq .object.sha)" = "$RELEASE_COMMIT"
-            gh release upload v1.1 packages/* --clobber
-            gh release edit v1.1 --target "$RELEASE_COMMIT" --title v1.1 --notes-file release-notes.md
+            test "$(gh api "repos/$GH_REPO/git/ref/tags/v1.2" --jq .object.sha)" = "$RELEASE_COMMIT"
+            gh release upload v1.2 packages/* --clobber
+            gh release edit v1.2 --target "$RELEASE_COMMIT" --title v1.2 --notes-file release-notes.md
           else
-            gh release create v1.1 packages/* --target "$RELEASE_COMMIT" --title v1.1 --notes-file release-notes.md --draft
+            gh release create v1.2 packages/* --target "$RELEASE_COMMIT" --title v1.2 --notes-file release-notes.md --draft
           fi
-          gh release view v1.1 --json assets > release.json
+          gh release view v1.2 --json assets > release.json
           jq -e '.assets | length == 3 and all(.[]; .size > 0)' release.json
-          test "$(gh api "repos/$GH_REPO/git/ref/tags/v1.1" --jq .object.sha)" = "$RELEASE_COMMIT"
-          gh release edit v1.1 --draft=false --latest
+          test "$(gh api "repos/$GH_REPO/git/ref/tags/v1.2" --jq .object.sha)" = "$RELEASE_COMMIT"
+          gh release edit v1.2 --draft=false --latest

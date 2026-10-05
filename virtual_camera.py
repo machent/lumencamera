@@ -20,6 +20,7 @@ V4L2_CAP_VIDEO_OUTPUT = 0x00000002
 V4L2_CAP_DEVICE_CAPS = 0x80000000
 CAPABILITY = struct.Struct('=16s32s32sIII3I')
 LOG = logging.getLogger('lumencamera.virtual')
+CAMERA_LABEL = 'LumenCamera'
 
 
 def is_loopback_driver(driver):
@@ -54,45 +55,109 @@ def virtual_devices(device_root=Path('/dev')):
     return sorted(found, key=lambda info: 'lumencamera' not in info['name'].replace(' ', '').casefold())
 
 
+def _check_cancel(cancel):
+    if cancel is not None and cancel.is_set():
+        raise RuntimeError('Virtual camera startup cancelled.')
+
+
+def _authorize(arguments, cancel=None):
+    _check_cancel(cancel)
+    pkexec = shutil.which('pkexec')
+    if not pkexec:
+        raise RuntimeError('Virtual camera setup needs PolicyKit (pkexec).')
+    process = subprocess.Popen([pkexec, *arguments], stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, text=True)
+    deadline = time.monotonic() + 120
+    while True:
+        try:
+            _check_cancel(cancel)
+        except RuntimeError:
+            process.terminate()
+            try:
+                process.communicate(timeout=2)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.communicate()
+            raise
+        try:
+            _stdout, stderr = process.communicate(timeout=0.2)
+            break
+        except subprocess.TimeoutExpired:
+            if time.monotonic() >= deadline:
+                process.kill()
+                process.communicate()
+                raise RuntimeError('Administrator authorization timed out.')
+    _check_cancel(cancel)
+    if process.returncode:
+        raise RuntimeError('Could not set up LumenCamera: ' +
+                           (stderr.strip() or 'administrator authorization was cancelled'))
+
+
+def _named_device_exists():
+    # A busy or inaccessible device can disappear from writable-output queries.
+    # Check only virtual devices; never change a physical camera or an OBS device.
+    for name in Path('/sys/devices/virtual/video4linux').glob('video*/name'):
+        try:
+            if name.read_text().strip() == CAMERA_LABEL:
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def _named_outputs():
+    return [device for device in virtual_devices() if device['name'] == CAMERA_LABEL]
+
+
+def _wait_named_outputs(cancel=None):
+    deadline = time.monotonic() + 3
+    while True:
+        _check_cancel(cancel)
+        found = _named_outputs()
+        if found:
+            return found
+        if time.monotonic() >= deadline:
+            return []
+        # Allow udev to set camera-group permissions after device creation.
+        if cancel is not None:
+            cancel.wait(0.05)
+        else:
+            time.sleep(0.05)
+
+
 def discover_virtual_devices(cancel=None):
-    """Load an installed module as OBS does; never install/unload a module."""
-    if not Path('/sys/module/v4l2loopback').exists():
-        LOG.info('Loading the installed v4l2loopback module with exclusive_caps=1')
-        search = os.environ.get('PATH', '') + ':/usr/sbin:/sbin'
+    """Use an exact LumenCamera label without changing existing OBS devices."""
+    _check_cancel(cancel)
+    found = _named_outputs()
+    search = os.environ.get('PATH', '') + ':/usr/sbin:/sbin'
+    if not found and not Path('/sys/module/v4l2loopback').exists():
+        LOG.info('Loading v4l2loopback with exclusive_caps=1 and name %s', CAMERA_LABEL)
         modinfo = shutil.which('modinfo', path=search)
         modprobe = shutil.which('modprobe', path=search)
         if not modinfo or not modprobe or subprocess.run([modinfo, 'v4l2loopback'], capture_output=True, timeout=5).returncode:
             raise RuntimeError('Virtual camera requires the installed v4l2loopback kernel module (the same dependency used by OBS). Install or build it for your running kernel, then try again.')
-        pkexec = shutil.which('pkexec')
-        if not pkexec:
-            raise RuntimeError('Load v4l2loopback first with exclusive_caps=1. Automatic loading needs PolicyKit (pkexec).')
-        process = subprocess.Popen([pkexec, modprobe, 'v4l2loopback', 'exclusive_caps=1',
-                                    'card_label=LumenCamera Virtual Camera'], stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE, text=True)
-        deadline = time.monotonic() + 120
-        while True:
-            if cancel is not None and cancel.is_set():
-                process.terminate()
-                try:
-                    process.communicate(timeout=2)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.communicate()
-                raise RuntimeError('Virtual camera startup cancelled.')
-            try:
-                _stdout, stderr = process.communicate(timeout=0.2)
-                break
-            except subprocess.TimeoutExpired:
-                if time.monotonic() >= deadline:
-                    process.kill()
-                    process.communicate()
-                    raise RuntimeError('Administrator authorization timed out.')
-        if process.returncode:
-            raise RuntimeError('Could not load v4l2loopback: ' + (stderr.strip() or 'administrator authorization was cancelled'))
-    found = virtual_devices()
+        _authorize([modprobe, 'v4l2loopback', 'exclusive_caps=1',
+                    'card_label=' + CAMERA_LABEL], cancel)
+        found = _wait_named_outputs(cancel)
     if not found:
-        raise RuntimeError('No writable, idle v4l2loopback camera was found. Stop any OBS virtual-camera output and check device permissions, then try again. For Discord/WebRTC, the device should use exclusive_caps=1.')
-    LOG.info('Available loopback outputs: %s', ', '.join(item['path'] + ' (' + item['name'] + ')' for item in found))
+        if _named_device_exists():
+            raise RuntimeError('The LumenCamera virtual camera is busy or not writable. Stop other virtual-camera output using LumenCamera and check device permissions, then try again.')
+        control = shutil.which('v4l2loopback-ctl', path=search)
+        if not control:
+            raise RuntimeError('Creating the LumenCamera device requires v4l2loopback-ctl. Install v4l2loopback-utils on Ubuntu or v4l2loopback from RPM Fusion Free on Fedora.')
+        try:
+            help_result = subprocess.run([control, '--help'], capture_output=True,
+                                         text=True, timeout=5)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise RuntimeError('Could not check v4l2loopback-ctl: ' + str(error)) from error
+        if not re.search(r'(?m)^\s*(?:\S*v4l2loopback-ctl\s+)?add(?:\s|$)', help_result.stdout + help_result.stderr):
+            raise RuntimeError('The installed v4l2loopback utility cannot add devices dynamically. Update the v4l2loopback module and utility to version 0.13 or newer, or start LumenCamera after a reboot before starting OBS virtual output. LumenCamera will not unload or rename an existing OBS device.')
+        LOG.info('Creating a separate %s loopback device with exclusive_caps=1', CAMERA_LABEL)
+        _authorize([control, 'add', '-n', CAMERA_LABEL, '-x', '1'], cancel)
+        found = _wait_named_outputs(cancel)
+    if not found:
+        raise RuntimeError('The LumenCamera device was created but no writable, idle output was found. Check device permissions and stop other output using that device, then try again.')
+    LOG.info('Available LumenCamera outputs: %s', ', '.join(item['path'] + ' (' + item['name'] + ')' for item in found))
     return found
 
 

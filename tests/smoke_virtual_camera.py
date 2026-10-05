@@ -183,7 +183,7 @@ def tick():
 
 GLib.timeout_add(100, tick)
 GLib.timeout_add_seconds(20, lambda: error('Virtual-camera smoke test timed out'))
-with patch('app.discover_virtual_devices', return_value=[dict(path='/unused-test-device', name='LumenCamera Virtual Camera')]), patch('app.VirtualCameraOutput', side_effect=factory):
+with patch('app.discover_virtual_devices', return_value=[dict(path='/unused-test-device', name='LumenCamera')]), patch('app.VirtualCameraOutput', side_effect=factory):
     app.run(['virtual-camera-smoke'])
 assert phase == 6 and not failures, (phase, failures)
 print('PASS: production sink uses MMAP, blocks device allocation queries and rejects invalid devices; real YUY2 output, padded RGB, mirroring, black gaps, source resizing; GTK start/stop, simultaneous MKV recording, restart, error isolation, close cleanup')

@@ -5,7 +5,7 @@
 %global __brp_strip_lto %{nil}
 
 Name:           lumencamera
-Version:        1.1
+Version:        1.2
 Release:        1%{?dist}
 Summary:        Webcam photos, videos and hardware camera controls
 License:        GPL-3.0-only
@@ -21,6 +21,7 @@ Requires:       gstreamer1-plugins-base
 Requires:       gstreamer1-plugins-good
 Requires:       v4l-utils
 Requires:       akmod-v4l2loopback
+Requires:       v4l2loopback
 Requires:       polkit
 
 %description
@@ -57,6 +58,10 @@ install -D -m 0644 icon.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/
 %{_datadir}/icons/hicolor/scalable/apps/io.github.machent.LumenCamera.svg
 
 %changelog
+* Mon Oct 05 2026 Lumen Camera contributors - 1.2-1
+- Use a separate LumenCamera loopback device without changing OBS devices.
+- Require the loopback control utility and retain the complete HIJACK bundle.
+
 * Fri Oct 02 2026 Lumen Camera contributors - 1.1-1
 - Add virtual camera output, MKV microphone recording and Camera Defaults.
 - Bundle both HIJACK games and the video with the warning and playback flow.

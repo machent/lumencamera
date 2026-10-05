@@ -1,13 +1,14 @@
 # Lumen Camera
 
-**Version 1.1** includes virtual camera output, Matroska recording with optional
+**Version 1.2** names the virtual camera **LumenCamera**, including when an OBS
+loopback device already exists. It includes virtual camera output, Matroska recording with optional
 microphone audio, Camera Defaults, native X11/Wayland support, and the bundled
 HIJACK easter egg. Download the `.deb` or `.rpm` from
-[the v1.1 release](https://github.com/machent/lumencamera/releases/tag/v1.1).
+[the v1.2 release](https://github.com/machent/lumencamera/releases/tag/v1.2).
 
 A modern webcam app for Fedora and Ubuntu with camera selection, photo capture, video recording, adjustable camera controls, and customizable filenames and save folders.
 
-**HIJACK easter egg (included in v1.1):**
+**HIJACK easter egg (included in v1.2):**
 opening Settings on KDE Plasma 6 on Wayland and a Fedora/Ubuntu-based system has
 an independent 20% chance to reveal a `?????` button with animated tearing,
 static and a glitching aura. Hovering turns its highlight purple and shows a
@@ -36,7 +37,7 @@ loud audio. The game payloads live in `easter-eggs/HIJACK-FEDORA.run` and
 `easter-eggs/HIJACK-UBUNTU.run`; builds without those optional files still work
 as a webcam app. See [game file locations](easter-eggs/README.md).
 
-The signed APT/DNF repositories include the complete **v1.1 x86-64 bundle**,
+The signed APT/DNF repositories include the complete **v1.2 x86-64 bundle**,
 including both HIJACK games and the video. Existing installations can upgrade
 through their package manager; setup and upgrade commands are on the
 [installation website](https://machent.github.io/lumencamera/).
@@ -61,26 +62,35 @@ This feature requires **v4l2loopback**, the kernel-module dependency used by
 [OBS's Linux virtual camera](https://github.com/obsproject/obs-studio/blob/master/plugins/linux-v4l2/v4l2-output.c).
 OBS itself is not required. The `.run` installer uses an existing v4l2loopback
 module built for the running kernel. For source and `.run` installations, install
-`v4l2loopback-dkms` on Ubuntu, or `akmod-v4l2loopback` from
+`v4l2loopback-dkms` and `v4l2loopback-utils` on Ubuntu, or
+`akmod-v4l2loopback` and `v4l2loopback` from
 [RPM Fusion Free](https://rpmfusion.org/Configuration) on Fedora. PolicyKit's
-`pkexec` command is needed to load an installed module from the app.
+`pkexec` command is needed to load the installed module or create a named device
+from the app.
 
-The v1.1 native packages declare `v4l2loopback-dkms` and `pkexec`
-as Debian/Ubuntu dependencies, and `akmod-v4l2loopback` and `polkit` as Fedora
-dependencies. APT/DNF installs these dependencies when installing v1.1 from the repositories or package files;
+The v1.2 native packages declare `v4l2loopback-dkms`, `v4l2loopback-utils` and `pkexec`
+as Debian/Ubuntu dependencies, and `akmod-v4l2loopback`, `v4l2loopback` and `polkit` as Fedora
+dependencies. APT/DNF installs these dependencies when installing v1.2 from the repositories or package files;
 Fedora needs RPM Fusion Free enabled. Installing a kernel
 module package does not replace the requirement for a module built and loadable
 for the running kernel. The published v1.0 packages do not contain this feature.
 
 1. Start the webcam preview, then click **Start virtual camera**.
-2. If the installed module is not loaded, an administrator prompt loads it with
-   `exclusive_caps=1` and the name **LumenCamera Virtual Camera**. If it is already
-   loaded, the app reuses an available loopback device. Several available devices
-   open a selector; busy or physical camera devices are never offered.
-3. Select the name displayed below the buttons in Discord or your other app.
-   An existing device can retain a name such as **OBS Virtual Camera**.
+2. The app reuses an idle device named exactly **LumenCamera**. If needed,
+   administrator authorization loads the module or creates a separate device
+   with `exclusive_caps=1` and that name. Existing OBS devices are left intact;
+   busy or physical camera devices are never used.
+3. Select **LumenCamera** in Discord or your other app after starting the output.
+   Reopen its camera list or reload the page if necessary. Sites that filter
+   virtual cameras may still omit it.
 4. Click **Stop virtual camera** to stop sharing. Closing Lumen Camera also stops
    the output; it does not unload your kernel module.
+
+On older modules/utilities without dynamic device support (such as Ubuntu 24.04's
+0.12.x packages), start LumenCamera before OBS loads the module, after a reboot.
+Adding a separate device while OBS already owns the loaded module requires
+v4l2loopback and its utility version 0.13 or newer. The app reports this limitation
+and never unloads the module automatically.
 
 The output follows preview mirroring and the selected webcam's hardware settings.
 It contains video only. Microphone choices in Record video apply to saved MKV
@@ -130,23 +140,23 @@ Ubuntu: `sudo apt install lumencamera`
 Open **Lumen Camera** from the application menu or run `lumencamera`.
 Future versions arrive through your usual system updates.
 
-## Install version 1.1 from a package file
+## Install version 1.2 from a package file
 
-The complete v1.1 packages target **x86-64 (amd64)** because the bundled HIJACK
+The complete v1.2 packages target **x86-64 (amd64)** because the bundled HIJACK
 games contain x86-64 executables.
 
-Download the package for your distribution from [GitHub Releases](https://github.com/machent/lumencamera/releases/tag/v1.1).
+Download the package for your distribution from [GitHub Releases](https://github.com/machent/lumencamera/releases/tag/v1.2).
 
 Ubuntu / Debian, from the download folder:
 
 ```bash
-sudo apt install ./lumencamera_1.1-1_amd64.deb
+sudo apt install ./lumencamera_1.2-1_amd64.deb
 ```
 
 Fedora, from the download folder:
 
 ```bash
-sudo dnf install ./lumencamera-1.1-1*.x86_64.rpm
+sudo dnf install ./lumencamera-1.2-1*.x86_64.rpm
 ```
 
 Open Lumen Camera from the application menu or run `lumencamera`. The release includes SHA-256 checksums. Signed APT and DNF repositories are also available as described above.

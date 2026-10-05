@@ -7,7 +7,7 @@ import re
 import tempfile
 from pathlib import Path
 
-VERSION = '1.1'
+VERSION = '1.2'
 APP_ID = 'io.github.machent.LumenCamera'
 
 

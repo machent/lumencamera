@@ -41,12 +41,12 @@ def verify(extracted):
             isinstance(target, ast.Name) and target.id == 'VERSION'
             for target in node.targets
         ):
-            if ast.literal_eval(node.value) != '1.1':
-                raise RuntimeError('Packaged application version is not 1.1')
+            if ast.literal_eval(node.value) != '1.2':
+                raise RuntimeError('Packaged application version is not 1.2')
             break
     else:
         raise RuntimeError('Packaged application version is missing')
-    print('PASS: v1.1 runtime, both executable HIJACK games and video match source')
+    print('PASS: v1.2 runtime, both executable HIJACK games and video match source')
 
 
 if __name__ == '__main__':
